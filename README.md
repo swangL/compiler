@@ -1,2 +1,2 @@
 # compiler
-Dette er et project i at forstå og implementere et simpelt programmeringssprog
+Dette er et projekt i at forstå og implementere et simpelt programmeringssprog

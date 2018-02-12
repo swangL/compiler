@@ -86,6 +86,11 @@ rule Token = parse
                                   ( int (Encoding.UTF8.GetString(lexbuf.Lexeme))
                                   , getPos lexbuf )
                               }
+
+  | ("true" | "false")  { Parser.BOOLLIT
+                                  ( bool()
+                                  , getPos lexbuf )
+                              }
   | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*
                           { keyword ( Encoding.UTF8.GetString(lexbuf.Lexeme)
                                     , getPos lexbuf ) }

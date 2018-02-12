@@ -36,6 +36,7 @@ let parse_error_rich =
 
 %token <int*(int*int)> NUM
 %token <char*(int*int)> CHARLIT
+%token <bool*(int*int)> BOOLLIT
 %token <string*(int*int)> ID STRINGLIT
 %token <(int*int)> IF THEN ELSE LET IN EOF
 %token <(int*int)> AND OR NOT
@@ -107,6 +108,7 @@ BinOp : PLUS  { (Lambda
 
 Exp : NUM            { Constant (IntVal (fst $1), snd $1) }
     | CHARLIT        { Constant (CharVal (fst $1), snd $1) }
+    | BOOLLIT        { Constant (BoolVal (fst $1), snd $1)}
     | ID             { Var $1 }
     | STRINGLIT      { StringLit $1 }
     | LCURLY Exps RCURLY

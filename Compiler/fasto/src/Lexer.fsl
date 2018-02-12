@@ -1,17 +1,17 @@
 ////////////////////////////////////////////////////////////////////
-// TODO: project task 1 
-//   implement lexer tokens for the new operators: 
-//   multiplication (*), division (/), numerical negation (~), 
+// TODO: project task 1
+//   implement lexer tokens for the new operators:
+//   multiplication (*), division (/), numerical negation (~),
 //   logical negation (not), logical and (&&), logical or (||),
 //   boolean literals (true, false)
 //
 //
-// TODO: project task 2 
-//   implement lexer tokens (keywords) for replicate, filter, scan 
+// TODO: project task 2
+//   implement lexer tokens (keywords) for replicate, filter, scan
 //
 //
-// TODO: project task 4 
-//   implement the lexer tokens (keywords) for array comprehension 
+// TODO: project task 4
+//   implement the lexer tokens (keywords) for array comprehension
 ////////////////////////////////////////////////////////////////////
 
 
@@ -103,6 +103,12 @@ rule Token = parse
                             Parser.STRINGLIT (AbSyn.fromCString str1, getPos lexbuf)
                           }
   | '+'                   { Parser.PLUS   (getPos lexbuf) }
+  | '*'                   { Parser.TIMES  (getPos lexbuf) }
+  | '/'                   { Parser.DIVIDE (getPos lexbuf) }
+  | "&&"                  { Parser.AND    (getPos lexbuf) }
+  | "||"                  { Parser.OR     (getPos lexbuf) }
+  | '~'                   { Parser.NEGATE (getPos lexbuf) }
+  | "not"                 { Parser.NOT    (getPos lexbuf) }
   | '-'                   { Parser.MINUS  (getPos lexbuf) }
   | "=>"                  { Parser.ARROW  (getPos lexbuf) }
   | "=="                  { Parser.DEQ    (getPos lexbuf) }

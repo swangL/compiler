@@ -1,0 +1,82 @@
+fun [char] assert (bool f) =
+  if f then write("true") else write("false")
+
+fun int main () =
+  let ww = write("subtraction") in
+    let w = write("pos int - pos int, ") in
+      let a = assert(5 - 3 == 2) in
+    let w = write("neg int - pos int, ") in
+      let a = assert((0-5) - 3 == (0-8)) in
+    let w = write("pos int - neg int, ") in
+      let a = assert(5 - (0-10) == 15) in
+    let w = write("neg int - neg int, ") in
+      let a = assert((0-7) - (0-5) == (0-2)) in
+
+  let ww = write("\naddition") in
+    let w = write("pos int + pos int, ") in
+      let a = assert(2 + 2 == 4) in 
+    let w = write("neg int + pos int, ") in
+      let a = assert((0 - 2) + 4 == 2) in 
+    let w = write("pos int + neg int, ") in
+      let a = assert(5 + (0-10) == (0-5)) in
+    let w = write("neg int + neg int, ") in
+      let a = assert((0-6) + (0-3) == (0-9)) in
+
+  let ww = write("\nmultiplication") in 
+    let w = write("pos int * pos int, ") in
+      let a = assert(4 * 4 == 16) in
+    let w = write("neg int * pos int, ") in
+      let a = assert((0-4) * 4 == (0-16)) in
+    let w = write("pos int * neg int, ") in
+      let a = assert(4 * (0-4) == (0-16)) in
+    let w = write("neg int * neg int, ") in
+      let a = assert((0-4) * (0-4) == 16) in
+    let w = write("zero * pos int, ") in
+      let a = assert(0 * 4 == 0) in
+    let w = write("zero * neg int, ") in
+      let a = assert(0 * (0-4) == 0) in
+  
+  let ww = write("\ndivision") in
+    let w = write("pos int / pos int, ") in
+      let a = assert(10 / 2 == 5) in
+    let w = write("neg int / pos int, ") in
+      let a = assert((0-10) / 2 == (0-5)) in
+    let w = write("pos int / neg int, ") in
+      let a = assert(10 / (0-2) == (0-5)) in
+    let w = write("neg int / neg int, ") in
+      let a = assert((0-10) / (0-2) == 5) in 
+    let w = write("zero / pos int, ") in
+      let a = assert(0 / 5 == 0) in 
+    let w = write("zero / neg int, ") in
+      let a = assert(0 / (0-5) == 0) in 
+  
+  let ww = write("\nlogical and") in
+    let w = write("true && true, ") in
+      let a = assert(true && true == true) in 
+    let w = write("true && false, ") in
+      let a = assert(true && false == false) in 
+    let w = write("false && true, ") in
+      let a = assert(false && true == false) in 
+    let w = write("false && false, ") in
+      let a = assert(false && false == false) in 
+
+  let ww = write(true || true == true) in
+
+  let ww = write("\nlogical or") in
+    let w = write("true || true, ") in
+      let a = assert(true || true == true) in
+    let w = write("true || false, ") in
+      let a = assert(true || false == true) in 
+    let w = write("false || true, ") in
+      let a = assert(false || true == true) in 
+    let w = write("false || false, ") in
+      let a = assert(false || false == false) in 
+
+  // TODO:
+  //let ww = write("\nlogical negation") in
+  //  let w = write("not true, ") in
+  //    let a = assert((not true) == false) in 
+  //  let w = write("not false, ") in
+  //    let a = assert(not false == true) in 
+  0
+  

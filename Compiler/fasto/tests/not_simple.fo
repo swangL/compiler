@@ -1,0 +1,2 @@
+fun bool main() =
+  let b = read(int) in write(true)

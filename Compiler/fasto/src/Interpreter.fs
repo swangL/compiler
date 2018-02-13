@@ -167,14 +167,14 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
         let res2   = evalExp(e2, vtab, ftab)
         match (res1, res2) with
           | (IntVal n1, IntVal n2) -> IntVal (n1*n2)
-          | _ -> invalidOperands "multiplication on non-integral args: " [(Int, Int)] res1 res2 pos
+          | (_,_) -> invalidOperands "multiplication on non-integral args: " [(Int, Int)] res1 res2 pos
 
   | Divide(e1, e2, pos) ->
         let res1   = evalExp(e1, vtab, ftab)
         let res2   = evalExp(e2, vtab, ftab)
         match (res1, res2) with
           | (IntVal n1, IntVal n2) -> if(n2 = 0) then invalidOperands "division on integral where the later is zero args: " [(Int, Int)] res1 res2 pos else IntVal (n1/n2)
-          | _ -> invalidOperands "division on non-integral args: " [(Int, Int)] res1 res2 pos
+          | (_, _) -> invalidOperands "division on non-integral args: " [(Int, Int)] res1 res2 pos
 
   | And (e1, e2, pos) ->
       let r1 = evalExp(e1, vtab, ftab)
@@ -191,17 +191,17 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
         | (BoolVal b1, BoolVal b2) -> BoolVal (b1 || b2)
         | (_, _) -> invalidOperands "Invalid OR operand types" [(Bool, Bool)] r1 r2 pos
 
-//  | Not(e1, pos) ->
-//      let r1 = evalExp(e1, vtab, ftab)
-//      match (r1) with
-//        | (BoolVal b1) -> BoolVal (not b1)
-//        | (_,_) -> invalidOperands "Invalid NOT operand types" [(Bool)] r1 pos
+  | Not(e1, pos) ->
+      let r1 = evalExp(e1, vtab, ftab)
+      match r1 with
+        | BoolVal b1 -> BoolVal (not b1)
+        | _ -> invalidOperand "Invalid NOT operand types" Bool r1 pos
 
-//  | Negate(e1, pos) ->
-//      let r1 = evalExp(e1, vtab, ftab)
-//      match (r1) with
-//        | (IntVal n1) -> IntVal (~n1)
-//        | (_,_) -> invalidOperands "Invalid Negate operand types" [(Int)] r1 pos
+  | Negate(e1, pos) ->
+      let r1 = evalExp(e1, vtab, ftab)
+      match r1 with
+        | IntVal n1 -> IntVal (-n1)
+        | _ -> invalidOperand "Invalid Negate operand types" Int r1 pos
 
   | Equal(e1, e2, pos) ->
         let r1 = evalExp(e1, vtab, ftab)

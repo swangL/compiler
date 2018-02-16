@@ -49,10 +49,10 @@ let parse_error_rich =
 %token <(int*int)> LPAR RPAR LBRACKET RBRACKET LCURLY RCURLY
 
 %nonassoc ifprec letprec
+%left DEQ LTH
 %left AND OR
 %left NOT
 %left NEGATE
-%left DEQ LTH
 %left PLUS MINUS
 %left TIMES
 %left DIVIDE

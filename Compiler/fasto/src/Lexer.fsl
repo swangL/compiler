@@ -63,6 +63,7 @@ let keyword (s, pos) =
        | "fun"          -> Parser.FUN pos
        | "fn"           -> Parser.FN pos
        | "op"           -> Parser.OP pos
+       | "not"          -> Parser.NOT pos
 
 (* specials: *)
        | "iota"         -> Parser.IOTA pos
@@ -72,6 +73,11 @@ let keyword (s, pos) =
        | "write"        -> Parser.WRITE pos
        | _              -> Parser.ID (s, pos)
 
+
+let boolChooser(s) =
+     match s with
+      | "true" -> true
+      | _-> false
 }
 
 rule Token = parse
@@ -88,7 +94,7 @@ rule Token = parse
                               }
 
   | ("true" | "false")  { Parser.BOOLLIT
-                                  ( bool()
+                                  ( boolChooser(Encoding.UTF8.GetString(lexbuf.Lexeme))
                                   , getPos lexbuf )
                               }
   | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*
@@ -113,7 +119,6 @@ rule Token = parse
   | "&&"                  { Parser.AND    (getPos lexbuf) }
   | "||"                  { Parser.OR     (getPos lexbuf) }
   | '~'                   { Parser.NEGATE (getPos lexbuf) }
-  | "not"                 { Parser.NOT    (getPos lexbuf) }
   | '-'                   { Parser.MINUS  (getPos lexbuf) }
   | "=>"                  { Parser.ARROW  (getPos lexbuf) }
   | "=="                  { Parser.DEQ    (getPos lexbuf) }

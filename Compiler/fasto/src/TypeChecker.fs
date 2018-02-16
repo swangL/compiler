@@ -66,9 +66,9 @@ let rec checkBinOp  (ftab : FunTable)
 (* Determine the type of an expression.  On the way, decorate each node in the
    syntax tree with inferred types.  The result consist of a pair: the result
    type tupled with the type-decorated expression. An exception is raised
-   immediately on the first type mismatch - this happens in "checkTypesEqualOrError".  
-   (It could instead collect each error as part of the result of checkExp and 
-    report all errors at the end.) 
+   immediately on the first type mismatch - this happens in "checkTypesEqualOrError".
+   (It could instead collect each error as part of the result of checkExp and
+    report all errors at the end.)
 *)
 and checkExp  (ftab : FunTable)
               (vtab : VarTable)
@@ -108,23 +108,45 @@ and checkExp  (ftab : FunTable)
         Implement by pattern matching Plus/Minus above.
         See `AbSyn.fs` for the expression constructors of `Times`, ...
     *)
-    | Times (_, _, _) ->        
-        failwith "Unimplemented type check of multiplication"
+    | Times (e1, e2, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        let (t2, e2_dec) = checkExp ftab vtab e2
+        if (Int = t1 && Int = t2)
+        then (Int, Times (e1_dec, e2_dec, pos))
+        else raise (MyError ("In Times: one of subexpression types is not Int: "+ppType t1+" and "+ppType t2, pos))
 
-    | Divide (_, _, _) ->
-        failwith "Unimplemented type check of division"
+    | Divide (e1, e2, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        let (t2, e2_dec) = checkExp ftab vtab e2
+        if (Int = t1 && Int = t2)
+        then (Int, Divide (e1_dec, e2_dec, pos))
+        else raise (MyError ("In Divide: one of subexpression types is not Int: "+ppType t1+" and "+ppType t2, pos))
 
-    | And (_, _, _) ->
-        failwith "Unimplemented type check of &&"
+    | And (e1, e2, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        let (t2, e2_dec) = checkExp ftab vtab e2
+        if (Bool = t1 && Bool = t2)
+        then (Bool, And (e1_dec, e2_dec, pos))
+        else raise (MyError ("In And: one of subexpression types is not a boolean: "+ppType t1+" and "+ppType t2, pos))
 
-    | Or (_, _, _) ->
-        failwith "Unimplemented type check of ||"
+    | Or (e1, e2, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        let (t2, e2_dec) = checkExp ftab vtab e2
+        if (Bool = t1 && Bool = t2)
+        then (Bool, Or (e1_dec, e2_dec, pos))
+        else raise (MyError ("In Or: one of subexpression types is not a boolean: "+ppType t1+" and "+ppType t2, pos))
 
-    | Not (_, _) ->
-        failwith "Unimplemented type check of not"
+    | Not (e1, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        if (Bool = t1)
+        then (Bool, Not (e1_dec,pos))
+        else raise (MyError ("In Not: The subexpression type is not a boolean: "+ppType t1, pos))
 
-    | Negate (_, _) ->
-        failwith "Unimplemented type check of negate"
+    | Negate (e1, pos) ->
+        let (t1, e1_dec) = checkExp ftab vtab e1
+        if (Int = t1)
+        then (Int, Negate(e1_dec,pos))
+        else raise (MyError ("In Negate ~: The subexpression type is not an Int: "+ppType t1, pos))
 
     (* The types for e1, e2 must be the same. The result is always a Bool. *)
     | Equal (e1, e2, pos) ->
@@ -254,14 +276,14 @@ and checkExp  (ftab : FunTable)
              raise (err ("neutral element", n_type))
         else raise (err ("array element", elem_type))
 
-    (* TODO project task 2: 
-        See `AbSyn.fs` for the expression constructors of 
+    (* TODO project task 2:
+        See `AbSyn.fs` for the expression constructors of
         `Replicate`, `Filter`, `Scan`.
 
         Hints for `replicate(n, a)`:
         - recursively type check `n` and `a`
         - check that `n` has integer type
-        - assuming `a` is of type `t` the result type 
+        - assuming `a` is of type `t` the result type
           of replicate is `[t]`
     *)
     | Replicate (_, _, _, _) ->
@@ -279,9 +301,9 @@ and checkExp  (ftab : FunTable)
     | Filter (_, _, _, _) ->
         failwith "Unimplemented type check of map"
 
-    (* TODO project task 2: `scan(f, ne, arr)` 
+    (* TODO project task 2: `scan(f, ne, arr)`
         Hint: Implementation is very similar to `reduce(f, ne, arr)`.
-              (The difference between `scan` and `reduce` is that 
+              (The difference between `scan` and `reduce` is that
               scan's return type is the same as the type of `arr`,
               while reduce's return type is that of an element of `arr`).
     *)
@@ -362,4 +384,3 @@ let checkProg (funDecs : UntypedFunDec list) : TypedFunDec list =
       | Some (ret_type, args, mainpos) ->
         raise ( MyError("Unexpected argument to main: "+showFunType (args, ret_type)+
                         " (should be () -> <anything>)", mainpos) )
-

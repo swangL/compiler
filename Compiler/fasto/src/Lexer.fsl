@@ -64,11 +64,13 @@ let keyword (s, pos) =
        | "fn"           -> Parser.FN pos
        | "op"           -> Parser.OP pos
        | "not"          -> Parser.NOT pos
-
 (* specials: *)
        | "iota"         -> Parser.IOTA pos
        | "map"          -> Parser.MAP  pos
        | "reduce"       -> Parser.REDUCE pos
+       | "scan"         -> Parser.SCAN pos
+       | "filter"       -> Parser.FILTER pos
+       | "replicate"    -> Parser.REP pos
        | "read"         -> Parser.READ pos
        | "write"        -> Parser.WRITE pos
        | _              -> Parser.ID (s, pos)

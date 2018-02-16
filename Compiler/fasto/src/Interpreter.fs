@@ -305,10 +305,10 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
          under predicate `p`, i.e., `p(a) = true`;
        - create an `ArrayVal` from the (list) result of the previous step.
   *)
-  | Filter (_, _, _, _) ->
-        failwith "Unimplemented interpretation of map"
-
+  | Filter (farg, arrexp, _, pos) ->
+      failwith "Unimplemented interpretation of scan"
   (* TODO project task 2: `scan(f, ne, arr)`
+
      Implementation similar to reduce, except that it produces an array
      of the same type and length to the input array `arr`.
   *)

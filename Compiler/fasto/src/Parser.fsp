@@ -54,8 +54,7 @@ let parse_error_rich =
 %left NOT
 %left NEGATE
 %left PLUS MINUS
-%left TIMES
-%left DIVIDE
+%left TIMES DIVIDE
 
 %start Prog
 %type <AbSyn.UntypedProg> Prog

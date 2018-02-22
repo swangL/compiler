@@ -261,13 +261,10 @@ let rec compileExp  (e      : TypedExp)
       let code2 = compileExp e2 vtable t2
       code1 @ code2 @ [Mips.DIV (place,t1,t2)]
 
-  | Not (e1, pos) -> //BUT HOW????
-      let lTrue = newName "true"
-      let lFalse = newName "false"
+  | Not (e1, pos) -> 
       let t1 = newName "not"
-      let code1 = compileCond e1 vtable lFalse lTrue
-      let code2 = compileExp e1 vtable t1
-      code1 @ [Mips.LABEL lTrue]@ [Mips.LABEL lFalse]
+      let code1 = compileExp e1 vtable t1
+      code1 @ [Mips.XORI (place, t1, "1")]
 
   | Negate (e1, pos) ->
       let t1 = newName "negate"

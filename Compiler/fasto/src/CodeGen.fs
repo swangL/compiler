@@ -172,9 +172,12 @@ let rec compileExp  (e      : TypedExp)
       else
         [ Mips.LUI (place, makeConst (n / 65536))
         ; Mips.ORI (place, place, makeConst (n % 65536)) ]
-  | Constant (BoolVal b, pos) -> 
+  | Constant (BoolVal b, pos) ->
       (* TODO project task 1: represent `true`/`false` values as `1`/`0` *)
-      failwith "Unimplemented code generation of boolean constants"
+      if b then
+         [ Mips.LI (place, makeConst (int 1)) ]
+      else
+         [ Mips.LI (place, makeConst (int 0)) ]               
   | Constant (CharVal c, pos) -> [ Mips.LI (place, makeConst (int c)) ]
 
   (* Create/return a label here, collect all string literals of the program
@@ -244,17 +247,32 @@ let rec compileExp  (e      : TypedExp)
         `Times` and `Divide` are very similar to `Plus`/`Minus`
         `Not` and `Negate` are simpler; you can use `Mips.XORI` for `Not`
   *)
-  | Times (_, _, _) ->
-      failwith "Unimplemented code generation of multiplication"
+  | Times (e1, e2, pos) ->
+      let t1 = newName "times_L"
+      let t2 = newName "times_R"
+      let code1 = compileExp e1 vtable t1
+      let code2 = compileExp e2 vtable t2
+      code1 @ code2 @ [Mips.MUL (place,t1,t2)]
 
-  | Divide (_, _, _) ->
-      failwith "Unimplemented code generation of division"
+  | Divide (e1, e2, pos) ->
+      let t1 = newName "divide_L"
+      let t2 = newName "divide_R"
+      let code1 = compileExp e1 vtable t1
+      let code2 = compileExp e2 vtable t2
+      code1 @ code2 @ [Mips.DIV (place,t1,t2)]
 
-  | Not (_, _) ->
-      failwith "Unimplemented code generation of not"
+  | Not (e1, pos) -> //BUT HOW????
+      let lTrue = newName "true"
+      let lFalse = newName "false"
+      let t1 = newName "not"
+      let code1 = compileCond e1 vtable lFalse lTrue
+      let code2 = compileExp e1 vtable t1
+      code1 @ [Mips.LABEL lTrue]@ [Mips.LABEL lFalse]
 
-  | Negate (_, _) ->
-      failwith "Unimplemented code generation of negate"
+  | Negate (e1, pos) ->
+      let t1 = newName "negate"
+      let code1 = compileExp e1 vtable t1
+      code1 @ [Mips.SUB (place,"0",t1)]
 
   | Let (dec, e1, pos) ->
       let (code1, vtable1) = compileDec dec vtable
@@ -405,9 +423,13 @@ let rec compileExp  (e      : TypedExp)
         in `e1 || e2` if the execution of `e1` will evaluate to `true` then
         the code of `e2` must not be executed. Similar for `And` (&&).
   *)
-  | And (_, _, _) ->
-      failwith "Unimplemented code generation of &&"
-
+  | And (e1,e2,pos) ->
+      let tlabel = "true"
+      let nlabel = "next"
+      let flabel = "false"
+      let t1 = newName"And_L"
+      let t2 = newName"And_R"
+      failwith "Unimplemented code generation of &&"        
   | Or (_, _, _) ->
       failwith "Unimplemented code generation of ||"
 

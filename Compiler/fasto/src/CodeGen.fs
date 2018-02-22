@@ -421,15 +421,30 @@ let rec compileExp  (e      : TypedExp)
         the code of `e2` must not be executed. Similar for `And` (&&).
   *)
   | And (e1,e2,pos) ->
-      let tlabel = "true"
-      let nlabel = "next"
-      let flabel = "false"
-      let t1 = newName"And_L"
-      let t2 = newName"And_R"
-      failwith "Unimplemented code generation of &&"        
-  | Or (_, _, _) ->
-      failwith "Unimplemented code generation of ||"
+      let t1label = newName "lbl_t1"
+      let t2label = newName "lbl_t2"
+      let flabel = newName "lbl_f"
+      let elabel = newName "lbl_e"
+      let t1 = newName "And_L"
+      let t2 = newName "And_R"
+      let code1 = compileCond e1 vtable t1label flabel
+      let code2 = compileCond e2 vtable t2label flabel
+      code1 @ [Mips.LABEL t1label] @ code2 @ 
+      [Mips.LABEL t2label; Mips.LI (place, makeConst (int 1)); Mips.J elabel; 
+      Mips.LABEL flabel; Mips.LI (place, makeConst (int 0)); Mips.LABEL elabel]
 
+  | Or (e1, e2, pos) ->
+      let tlabel = newName "lbl_t"
+      let f1label = newName "lbl_f1"
+      let f2label = newName "lbl_f2"
+      let elabel = newName "lbl_e"
+      let t1 = newName "Or_L"
+      let t2 = newName "Or_R"
+      let code1 = compileCond e1 vtable tlabel f1label
+      let code2 = compileCond e2 vtable tlabel f2label
+      code1 @ [Mips.LABEL f1label] @ code2 @ 
+      [Mips.LABEL f2label; Mips.LI (place, makeConst (int 0)); Mips.J elabel; 
+      Mips.LABEL tlabel; Mips.LI (place, makeConst (int 1)); Mips.LABEL elabel]
   (* Indexing:
      1. generate code to compute the index
      2. check index within bounds

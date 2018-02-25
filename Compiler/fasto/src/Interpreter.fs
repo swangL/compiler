@@ -180,14 +180,14 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
       let r1 = evalExp(e1, vtab, ftab)
       let r2 = evalExp(e2, vtab, ftab)
       match (r1, r2) with
-        | (BoolVal b1, BoolVal b2) -> if (b1) then BoolVal(b1 && b2) else BoolVal(b1)
+        | (BoolVal b1, BoolVal b2) -> if b1 then BoolVal(b2) else BoolVal(b1)
         | (_, _) -> invalidOperands "Invalid AND operand types" [(Bool, Bool)] r1 r2 pos
 
   | Or (e1, e2, pos) ->
       let r1 = evalExp(e1, vtab, ftab)
       let r2 = evalExp(e2, vtab, ftab)
       match (r1, r2) with
-        | (BoolVal b1, BoolVal b2) -> BoolVal (b1 || b2)
+        | (BoolVal b1, BoolVal b2) -> if b1 then BoolVal(b1) else BoolVal (b2)
         | (_, _) -> invalidOperands "Invalid OR operand types" [(Bool, Bool)] r1 r2 pos
 
   | Not(e1, pos) ->

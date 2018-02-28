@@ -24,6 +24,7 @@ The main function of interest in this module is:
 
 open System
 open AbSyn
+open System.Web.Configuration
 
 (* An exception for reporting run-time errors. *)
 exception MyError of string * Position
@@ -294,8 +295,16 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
          the value of `a`; otherwise raise an error (containing
          a meaningful message).
   *)
-  | Replicate (_, _, _, _) ->
-        failwith "Unimplemented interpretation of replicate"
+  | Replicate (nExp, aExp, tp, pos) ->
+        let n = evalExp(nExp, vtab, ftab)
+        let a = evalExp(aExp, vtab, ftab)
+        match n with
+          | IntVal n ->
+            if n >= 0 then 
+              let rep = List.replicate n a 
+              ArrayVal(rep, valueType a)
+            else raise (MyError("Argument n must be greater or equal to zero." + ppExp 0 nExp, pos))
+          | otherwise -> raise (MyError("Argument n must be integer." + ppExp 0 nExp, pos))
 
   (* TODO project task 2: `filter(p, arr)`
        pattern match the implementation of map:
@@ -305,15 +314,49 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
          under predicate `p`, i.e., `p(a) = true`;
        - create an `ArrayVal` from the (list) result of the previous step.
   *)
+// | Map (farg, arrexp, _, _, pos) ->
+//        let arr  = evalExp(arrexp, vtab, ftab)
+//        let farg_ret_type = rtpFunArg farg ftab pos
+//        match arr with
+//          | ArrayVal (lst,tp1) ->
+//               let mlst = List.map (fun x -> evalFunArg (farg, vtab, ftab, pos, [x])) lst
+//               ArrayVal (mlst, farg_ret_type)
+//          | otherwise -> raise (MyError( "Second argument of map is not an array: "+ppVal 0 arr
+//                                       , pos))
   | Filter (farg, arrexp, _, pos) ->
-      failwith "Unimplemented interpretation of scan"
+      failwith "NOT QUITE DONE"
+      let farg_ret_type = rtpFunArg farg ftab pos
+
+      match farg_ret_type with
+        | Bool ->
+          let arr = evalExp(arrexp, vtab, ftab)
+          match arr with
+          | ArrayVal (lst, tp1) ->
+              let rec mapFun predFunc arr acc = 
+                match arr with
+                | [] -> acc
+                | x::xs -> if predFunc x then mapFun predFunc xs (acc @ x) else mapFun predFunc xs acc
+                
+              let funArg = fun x -> evalFunArg(farg, vtab, ftab, pos, [x])
+              let filt = mapFun funArg lst []
+              ArrayVal(filt, tp1)
+          | otherwise -> failwith "lol" //raise (MyError("Second argument must be an array: " + ppVal 0 arr, pos))
+        | otherwise -> failwith "lol" //raise (MyError("Function return type must be boolean: " + ppExp 0 farg_ret_type, pos))
   (* TODO project task 2: `scan(f, ne, arr)`
 
      Implementation similar to reduce, except that it produces an array
      of the same type and length to the input array `arr`.
   *)
-  | Scan (_, _, _, _, _) ->
-        failwith "Unimplemented interpretation of scan"
+  | Scan (farg, ne, arrexp, tp, pos) ->
+        let farg_ret_type = rtpFunArg farg ftab pos
+        let arr  = evalExp(arrexp, vtab, ftab)
+        let nel  = evalExp(ne, vtab, ftab)
+        match arr with
+          | ArrayVal (lst,tp1) ->
+               let scan = List.scan (fun acc x -> evalFunArg (farg, vtab, ftab, pos, [acc;x])) nel lst
+               ArrayVal(scan, tp1)
+          | otherwise -> raise (MyError("Third argument of scan is not an array: "+ppVal 0 arr
+                                       , pos))
 
   | Read (t,p) ->
         let str = Console.ReadLine()
@@ -371,7 +414,7 @@ and evalFunArg  ( funarg  : UntypedFunArg
   | (FunName fid) ->
     let fexp = SymTab.lookup fid ftab
     match fexp with
-      | None   -> raise (MyError("Call to known function "+fid, callpos))
+      | None   -> raise (MyError("Call to unknown function "+fid, callpos))
       | Some f -> callFunWithVtable(f, aargs, SymTab.empty(), ftab, callpos)
   | Lambda (rettype, parms, body, fpos) ->
     callFunWithVtable ( FunDec ("<anonymous>", rettype, parms, body, fpos)

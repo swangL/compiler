@@ -314,17 +314,7 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
          under predicate `p`, i.e., `p(a) = true`;
        - create an `ArrayVal` from the (list) result of the previous step.
   *)
-// | Map (farg, arrexp, _, _, pos) ->
-//        let arr  = evalExp(arrexp, vtab, ftab)
-//        let farg_ret_type = rtpFunArg farg ftab pos
-//        match arr with
-//          | ArrayVal (lst,tp1) ->
-//               let mlst = List.map (fun x -> evalFunArg (farg, vtab, ftab, pos, [x])) lst
-//               ArrayVal (mlst, farg_ret_type)
-//          | otherwise -> raise (MyError( "Second argument of map is not an array: "+ppVal 0 arr
-//                                       , pos))
   | Filter (farg, arrexp, _, pos) ->
-      failwith "NOT QUITE DONE"
       let farg_ret_type = rtpFunArg farg ftab pos
 
       match farg_ret_type with
@@ -332,13 +322,9 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
           let arr = evalExp(arrexp, vtab, ftab)
           match arr with
           | ArrayVal (lst, tp1) ->
-              let rec mapFun predFunc arr acc = 
-                match arr with
-                | [] -> acc
-                | x::xs -> if predFunc x then mapFun predFunc xs (acc @ x) else mapFun predFunc xs acc
-                
-              let funArg = fun x -> evalFunArg(farg, vtab, ftab, pos, [x])
-              let filt = mapFun funArg lst []
+              let funArg = fun x -> match evalFunArg(farg, vtab, ftab, pos, [x]) with
+                                    | BoolVal b -> b
+              let filt = List.filter funArg lst
               ArrayVal(filt, tp1)
           | otherwise -> failwith "lol" //raise (MyError("Second argument must be an array: " + ppVal 0 arr, pos))
         | otherwise -> failwith "lol" //raise (MyError("Function return type must be boolean: " + ppExp 0 farg_ret_type, pos))

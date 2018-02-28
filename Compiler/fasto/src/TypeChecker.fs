@@ -16,6 +16,7 @@ The main function of interest in this module is:
 *)
 
 open AbSyn
+open System.Linq.Expressions
 
 (* An exception for reporting type errors. *)
 exception MyError of string * Position
@@ -286,8 +287,11 @@ and checkExp  (ftab : FunTable)
         - assuming `a` is of type `t` the result type
           of replicate is `[t]`
     *)
-    | Replicate (_, _, _, _) ->
-        failwith "Unimplemented type check of replicate"
+    | Replicate (nExp, aExp, _, pos) ->
+        let (n_t, n_dec) = checkExp ftab vtab nExp
+        let (a_t, a_dec) = checkExp ftab vtab aExp
+        if n_t = Int then (Array a_t, Replicate(n_dec, a_dec, a_t, pos))
+        else raise (MyError( "Replicate: expected n to be an integer" , pos))
 
     (* TODO project task 2: Hint for `filter(f, arr)`
         Look into the type-checking lecture slides for the type rule of `map`

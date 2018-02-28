@@ -324,10 +324,12 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
           | ArrayVal (lst, tp1) ->
               let funArg = fun x -> match evalFunArg(farg, vtab, ftab, pos, [x]) with
                                     | BoolVal b -> b
+                                    | otherwise -> raise (MyError("Function return type must be boolean: " + ppFunArg 0 farg
+                                       , pos))
               let filt = List.filter funArg lst
               ArrayVal(filt, tp1)
-          | otherwise -> failwith "lol" //raise (MyError("Second argument must be an array: " + ppVal 0 arr, pos))
-        | otherwise -> failwith "lol" //raise (MyError("Function return type must be boolean: " + ppExp 0 farg_ret_type, pos))
+          | otherwise -> raise (MyError("Second argument must be an array: " + ppVal 0 arr, pos))
+        | otherwise -> raise (MyError("Function return type must be boolean: " + ppFunArg 0 farg, pos))
   (* TODO project task 2: `scan(f, ne, arr)`
 
      Implementation similar to reduce, except that it produces an array

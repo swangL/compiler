@@ -653,44 +653,46 @@ let rec compileExp  (e      : TypedExp)
         an error -- see implementation of `iota`.
   *)
   | Replicate (n_exp, a_exp, a_type, pos) ->
-        let size_reg = newName "size_reg"
-        let ele_reg = newName "ele_reg"
-        let n_code = compileExp n_exp vtable size_reg
-        let a_code = compileExp a_exp vtable ele_reg
-        let safe_lab = newName "safe_lab"
-        let checksize = [ Mips.ADDI (size_reg, size_reg, "-1")
-                        ; Mips.BGEZ (size_reg, safe_lab) // Jump to safe if n-1>=0
-                        ; Mips.LI ("5", makeConst (fst pos))
-                        ; Mips.J "_IllegalArrSizeError_"
-                        ; Mips.LABEL (safe_lab)
-                        ; Mips.ADDI (size_reg, size_reg, "1")
-                        ]
-        let iter_reg = newName "iter_reg"
-        let i_reg = newName "i_reg"
-        let init_regs = [ Mips.ADDI (iter_reg, place, "4") // place reg contains pointer to allocated mem (with dynalloc)
-                        ; Mips.MOVE (i_reg, "0")]
-        let loop_beg = newName "loop_beg"
-        let loop_end = newName "loop_end"
-        let tmp_reg = newName "tmp_reg"
+      // symbolic registers
+      let size_reg = newName "size_reg"
+      let ele_reg = newName "ele_reg"
+      let resit_reg = newName "resit_reg"
+      let i_reg = newName "i_reg"
+      let tmp_reg = newName "tmp_reg"
 
-        let loop_header = [ Mips.LABEL loop_beg // while ...
-                          ; Mips.SUB (tmp_reg, i_reg, size_reg)
-                          ; Mips.BGEZ (tmp_reg, loop_end)]
-        let loop_rep    = match getElemSize a_type with // do ..
-                          | One  -> [ Mips.SB (ele_reg, iter_reg, "0") ]
-                          | Four -> [ Mips.SW (ele_reg, iter_reg, "0") ] 
-        let loop_footer = match getElemSize a_type with // i++
-                          | One  -> [ Mips.ADDI (iter_reg, iter_reg, "1") ] 
-                          | Four -> [ Mips.ADDI (iter_reg, iter_reg, "4") ] 
-                          @
-                          [ Mips.ADDI (i_reg, i_reg, "1")
-                          ; Mips.J loop_beg
-                          ; Mips.LABEL loop_end]
-        n_code @ a_code
-        @ checksize
-        @ dynalloc (size_reg, place, a_type)
-        @ init_regs
-        @ loop_header @ loop_rep @ loop_footer
+      // labels
+      let safe_lab = newName "safe_lab"
+      let loop_beg = newName "loop_beg"
+      let loop_end = newName "loop_end"
+
+      let n_code = compileExp n_exp vtable size_reg
+      let a_code = compileExp a_exp vtable ele_reg
+
+      let checksize = [ Mips.ADDI (size_reg, size_reg, "-1")
+                      ; Mips.BGEZ (size_reg, safe_lab) // Jump to safe if n-1>=0
+                      ; Mips.LI ("5", makeConst (fst pos))
+                      ; Mips.J "_IllegalArrSizeError_"
+                      ; Mips.LABEL (safe_lab)
+                      ; Mips.ADDI (size_reg, size_reg, "1")
+                      ]
+      let init_regs = [ Mips.ADDI (resit_reg, place, "4") // place reg contains pointer to allocated mem (with dynalloc)
+                      ; Mips.MOVE (i_reg, "0")]
+
+      let loop_header = [ Mips.LABEL loop_beg // while ...
+                        ; Mips.SUB (tmp_reg, i_reg, size_reg)
+                        ; Mips.BGEZ (tmp_reg, loop_end)]
+      let loop_rep    = match getElemSize a_type with // do ..
+                        | One  -> [ Mips.SB (ele_reg, resit_reg, "0") ]
+                        | Four -> [ Mips.SW (ele_reg, resit_reg, "0") ] 
+      let loop_footer = [ Mips.ADDI (resit_reg, resit_reg, makeConst (elemSizeToInt (getElemSize a_type)))
+                        ; Mips.ADDI (i_reg, i_reg, "1")
+                        ; Mips.J loop_beg
+                        ; Mips.LABEL loop_end]
+      n_code @ a_code
+      @ checksize
+      @ dynalloc (size_reg, place, a_type)
+      @ init_regs
+      @ loop_header @ loop_rep @ loop_footer
   (* TODO project task 2: see also the comment to replicate.
      (a) `filter(f, arr)`:  has some similarity with the implementation of map.
      (b) Use `applyFunArg` to call `f(a)` in a loop, for every element `a` of `arr`.
@@ -716,8 +718,53 @@ let rec compileExp  (e      : TypedExp)
         the current location of the result iterator at every iteration of
         the loop.
   *)
-  | Scan (_, _, _, _, _) ->
-      failwith "Unimplemented code generation of scan"
+  | Scan (farg, acc_exp, arr_exp, ele_type, pos) ->
+      // symbolic registers
+      let size_reg = newName "size_reg"
+      let arr_reg = newName "arr_reg"
+      let acc_reg = newName "acc_reg"
+      let i_reg = newName "i_reg"
+      let resit_reg = newName "resit_reg" // result iteration reg
+      let tmp_reg = newName "tmp_reg" 
+
+      // labels
+      let loop_beg = newName "loop_beg"
+      let loop_end = newName "loop_end"
+      
+      // code
+      let arr_code = compileExp arr_exp vtable arr_reg
+      let acc_code = compileExp acc_exp vtable acc_reg
+      let get_size = [ Mips.LW (size_reg, arr_reg, "0") ]
+
+      let init_regs =   [ Mips.ADDI (arr_reg, arr_reg, "4")
+                        ; Mips.ADDI (resit_reg, place, "4")
+                        ; Mips.MOVE(i_reg, "0")
+                        ]
+      let loop_header = [ Mips.LABEL(loop_beg)
+                        ; Mips.SUB(tmp_reg, i_reg, size_reg)
+                        ; Mips.BGEZ(tmp_reg, loop_end)
+                        ]
+      let loop_load =   match getElemSize ele_type with
+                        | One ->  [ Mips.LB (tmp_reg, arr_reg, "0") ]
+                        | Four -> [ Mips.LW (tmp_reg, arr_reg, "0") ]
+                                  
+      let loop_apply =  applyFunArg(farg, [acc_reg; tmp_reg], vtable, acc_reg, pos)
+                        @
+                        match getElemSize ele_type with 
+                        | One ->  [ Mips.SB (acc_reg, resit_reg, "0") ]
+                        | Four -> [ Mips.SW (acc_reg, resit_reg, "0") ]
+
+      let loop_footer = [ Mips.ADDI (resit_reg, resit_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
+                        ; Mips.ADDI (arr_reg, arr_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
+                        ; Mips.ADDI(i_reg, i_reg, "1")
+                        ; Mips.J loop_beg
+                        ; Mips.LABEL loop_end
+                        ]
+      arr_code @ acc_code 
+      @ get_size
+      @ dynalloc (size_reg, place, ele_type)
+      @ init_regs
+      @ loop_header @ loop_load @ loop_apply @ loop_footer
 
 and applyFunArg ( ff     : TypedFunArg
                 , args   : Mips.reg list

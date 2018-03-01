@@ -342,7 +342,7 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
         match arr with
           | ArrayVal (lst,tp1) ->
                let scan = List.scan (fun acc x -> evalFunArg (farg, vtab, ftab, pos, [acc;x])) nel lst
-               match scan with
+               match scan with // List.scan creates a n+1 size array so ignore first element (which is initial acc)
                | (x::xs) -> ArrayVal(xs, tp1)
                | _ -> ArrayVal([], tp1)
           | otherwise -> raise (MyError("Third argument of scan is not an array: "+ppVal 0 arr

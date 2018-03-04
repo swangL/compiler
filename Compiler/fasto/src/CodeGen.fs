@@ -708,9 +708,67 @@ let rec compileExp  (e      : TypedExp)
          counter computed in step (c). You do this of course with a
          `Mips.SW(counter_reg, place, "0")` instruction.
   *)
-  | Filter (_, _, _, _) ->
-      failwith "Unimplemented code generation of map"
+  | Filter (farg, arr_exp, elem_type, pos) ->
+      (* symbolic registers *)
+      let size_reg = newName "size_reg" (* size of input array *)
+      let arr_reg  = newName "arr_reg"  (* address of array *)
+      let res_reg = newName "res_reg"
+      let size_outreg = newName "size_outreg" (*size of output array*) 
+      let resit_reg = newName "resit_reg" (* address of element in new array *)
+      let elem_reg = newName "elem_reg" (* address of single element *)
+      let i_reg = newName "i_reg"
+      let tmp_reg = newName "tmp_reg"
 
+     (* labels *)
+      let loop_beg = newName "loop_beg"
+      let loop_end = newName "loop_end"
+      let loop_inc = newName "loop_inc"
+    
+     (* code *)
+      let arr_code = compileExp arr_exp vtable arr_reg
+      let get_size = [ Mips.LW (size_reg, arr_reg, "0") ]
+
+      let init_regs = [ Mips.ADDI (resit_reg, place, "4")
+                      ; Mips.MOVE (i_reg, "0")
+                      ; Mips.ADDI (elem_reg, arr_reg, "4")
+                      ]
+      let loop_header = [ Mips.LABEL (loop_beg)
+                        ; Mips.SUB (tmp_reg, i_reg, size_reg)
+                        ; Mips.BGEZ (tmp_reg, loop_end) ]
+      let loop_filter0 =
+            match getElemSize elem_type with
+                | One -> Mips.LB(tmp_reg, elem_reg, "0")
+                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
+                | Four -> Mips.LW(tmp_reg, elem_reg, "0")
+                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
+      let loop_filtercheck =
+            Mips.BEQ(res_reg, "0", loop_inc)
+            :: match getElemSize elem_type with
+                    | One -> [Mips.SB(tmp_reg, resit_reg, "0")]
+                    | Four -> [Mips.SW(tmp_reg, resit_reg, "0")]
+            @ [Mips.ADDI(resit_reg, resit_reg, 
+                                    makeConst ( elemSizeToInt (getElemSize elem_type)))
+            ; Mips.ADDI(size_outreg, size_outreg, "1")]
+      let loop_footer =
+            [Mips.LABEL(loop_inc)
+            ;Mips.ADDI(i_reg, i_reg, "1")
+            ;Mips.ADDI(elem_reg, elem_reg, makeConst ( elemSizeToInt (getElemSize elem_type)))
+            ;Mips.J loop_beg
+            ;Mips.LABEL loop_end]
+
+      let set_outlen = 
+            [Mips.SW(size_outreg, place, "0")]
+      
+      arr_code
+      @ get_size
+      @ dynalloc (size_reg, place, elem_type)
+      @ init_regs
+      @ loop_header
+      @ loop_filter0
+      @ loop_filtercheck
+      @ loop_footer
+      @ set_outlen
+      
   (* TODO project task 2: see also the comment to replicate.
      `scan(f, ne, arr)`: you can inspire yourself from the implementation of
         `reduce`, but in the case of `scan` you will need to also maintain
@@ -721,7 +779,9 @@ let rec compileExp  (e      : TypedExp)
   | Scan (farg, acc_exp, arr_exp, ele_type, pos) ->
       // symbolic registers
       let size_reg = newName "size_reg"
-      let arr_reg = newName "arr_reg"
+      // ATTENTION
+      let arr_reg = newName "arr_reg" 
+      // MAYBE use another register for iteration
       let acc_reg = newName "acc_reg"
       let i_reg = newName "i_reg"
       let resit_reg = newName "resit_reg" // result iteration reg

@@ -748,8 +748,8 @@ let rec compileExp  (e      : TypedExp)
                         :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
 
       let loop_filtercheck =
-            Mips.BEQ(res_reg, "0", loop_inc)
-            :: match getElemSize elem_type with
+            Mips.BEQ(res_reg, "0", loop_inc) ::
+            match getElemSize elem_type with
             | One -> [Mips.SB(tmp_reg, resit_reg, "0")]
             | Four -> [Mips.SW(tmp_reg, resit_reg, "0")]
             @ [Mips.ADDI(resit_reg, resit_reg, makeConst ( elemSizeToInt (getElemSize elem_type)))

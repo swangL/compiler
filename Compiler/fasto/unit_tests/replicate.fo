@@ -1,0 +1,4 @@
+fun int main () = 
+  let a = replicate (4, 4) in let w = write(a[0]) in let w = write(a[1]) in let w = write(a[2]) in let w = write(a[3]) in
+  let a = replicate (4, true) in let w = write(a[0]) in let w = write(a[1]) in let w = write(a[2]) in let w = write(a[3]) in 0
+

@@ -726,29 +726,35 @@ let rec compileExp  (e      : TypedExp)
     
      (* code *)
       let arr_code = compileExp arr_exp vtable arr_reg
-      let get_size = [ Mips.LW (size_reg, arr_reg, "0") ]
+      let get_size =
+            [ Mips.LW (size_reg, arr_reg, "0") ]
 
-      let init_regs = [ Mips.ADDI (resit_reg, place, "4")
-                      ; Mips.MOVE (i_reg, "0")
-                      ; Mips.ADDI (elem_reg, arr_reg, "4")
-                      ]
-      let loop_header = [ Mips.LABEL (loop_beg)
-                        ; Mips.SUB (tmp_reg, i_reg, size_reg)
-                        ; Mips.BGEZ (tmp_reg, loop_end) ]
+      let init_regs =   
+            [ Mips.ADDI (elem_reg, arr_reg, "4")
+            ; Mips.ADDI (resit_reg, place, "4") 
+            ; Mips.MOVE (i_reg, "0")
+            ; Mips.MOVE (size_outreg, "0")]
+
+      let loop_header = 
+            [ Mips.LABEL (loop_beg)
+            ; Mips.SUB (tmp_reg, i_reg, size_reg)
+            ; Mips.BGEZ (tmp_reg, loop_end) ]
+
       let loop_filter0 =
             match getElemSize elem_type with
-                | One -> Mips.LB(tmp_reg, elem_reg, "0")
-                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
-                | Four -> Mips.LW(tmp_reg, elem_reg, "0")
-                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
+            | One -> Mips.LB(tmp_reg, elem_reg, "0")
+                        :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
+            | Four -> Mips.LW(tmp_reg, elem_reg, "0")
+                        :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
+
       let loop_filtercheck =
             Mips.BEQ(res_reg, "0", loop_inc)
             :: match getElemSize elem_type with
-                    | One -> [Mips.SB(tmp_reg, resit_reg, "0")]
-                    | Four -> [Mips.SW(tmp_reg, resit_reg, "0")]
-            @ [Mips.ADDI(resit_reg, resit_reg, 
-                                    makeConst ( elemSizeToInt (getElemSize elem_type)))
+            | One -> [Mips.SB(tmp_reg, resit_reg, "0")]
+            | Four -> [Mips.SW(tmp_reg, resit_reg, "0")]
+            @ [Mips.ADDI(resit_reg, resit_reg, makeConst ( elemSizeToInt (getElemSize elem_type)))
             ; Mips.ADDI(size_outreg, size_outreg, "1")]
+
       let loop_footer =
             [Mips.LABEL(loop_inc)
             ;Mips.ADDI(i_reg, i_reg, "1")

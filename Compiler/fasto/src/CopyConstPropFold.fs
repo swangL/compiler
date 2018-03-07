@@ -23,7 +23,8 @@ let rec copyConstPropFoldExp (vtable : VarTable)
         cases for variables, array indexing, and let-bindings. *)
         | Var (name, pos) ->
             match SymTab.lookup name vtable with
-            | Some x -> Var(string x,pos) //Tror ikke dette er helt rigtigt!
+            | Some (VarProp s) -> Var(s,pos)
+            | Some (ConstProp c) -> Constant(c,pos)
             | None -> Var(name,pos)
             (* TODO project task 3:
                 Should probably look in the symbol table to see if
@@ -34,8 +35,8 @@ let rec copyConstPropFoldExp (vtable : VarTable)
         | Index (name, e, t, pos) ->
             let e' = copyConstPropFoldExp vtable e
             match SymTab.lookup name vtable with
-                | Some x -> Index(string x,e',t,pos) //Samme her!! nok ikke helt rigtigt
-                | None -> Index(name,e',t,pos)
+                | Some (VarProp x) -> Index(x,e',t,pos)
+                | _ -> Index(name,e',t,pos)
                 (* TODO project task 3:
                 Should probably do the same as the `Var` case, for
                 the array name, and optimize the index expression `e` as well.
@@ -46,7 +47,7 @@ let rec copyConstPropFoldExp (vtable : VarTable)
                 | Var (a, pos) ->
                     //er i tvivl om denne
                     let vt' = SymTab.bind name (Propagatee.VarProp a) vtable
-                    let body' = copyConstPropFoldExp vt' (Var(a,pos))
+                    let body' = copyConstPropFoldExp vt' body
                     Let (Dec (name, e', decpos), body', pos)
 
                     (* TODO project task 3:
@@ -58,7 +59,7 @@ let rec copyConstPropFoldExp (vtable : VarTable)
                 | Constant (v, pos) ->
                     //Er i tvivl om denne
                     let vt' = SymTab.bind name (Propagatee.ConstProp v) vtable
-                    let body' = copyConstPropFoldExp vt' (Constant(v,pos))
+                    let body' = copyConstPropFoldExp vt' body
                     Let (Dec (name, e', decpos), body', pos)
 
                     (* TODO project task 3:

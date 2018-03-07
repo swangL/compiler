@@ -23,11 +23,8 @@ let rec copyConstPropFoldExp (vtable : VarTable)
         cases for variables, array indexing, and let-bindings. *)
         | Var (name, pos) ->
             match SymTab.lookup name vtable with
-            //Her ved jeg at disse er forkert, men dette
-            //skyldes at jeg ikke er helt sikker på om den skal kaldes
-            //recursivt igen, eller hvad kommentaren mener? 
-            | Some x -> Var(string x, pos)
-            | None -> Var(name, pos)
+            | Some x -> Var(string x,pos) //Tror ikke dette er helt rigtigt!
+            | None -> Var(name,pos)
             (* TODO project task 3:
                 Should probably look in the symbol table to see if
                 a binding corresponding to the current variable `name`
@@ -37,10 +34,8 @@ let rec copyConstPropFoldExp (vtable : VarTable)
         | Index (name, e, t, pos) ->
             let e' = copyConstPropFoldExp vtable e
             match SymTab.lookup name vtable with
-             //Her ved jeg at disse er forkert, men dette
-            //skyldes at jeg ikke er helt sikker på om den skal kaldes
-            //recursivt igen, eller hvad kommentaren mener?
-                | Some x -> Index(string x,e',t,pos)              | None -> Index(name,e',t,pos)
+                | Some x -> Index(string x,e',t,pos) //Samme her!! nok ikke helt rigtigt
+                | None -> Index(name,e',t,pos)
                 (* TODO project task 3:
                 Should probably do the same as the `Var` case, for
                 the array name, and optimize the index expression `e` as well.

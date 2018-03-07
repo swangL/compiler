@@ -1,0 +1,1008 @@
+diff --git a/Compiler/fasto/src/CodeGen.fs b/Compiler/fasto/src/CodeGen.fs
+index 1c40bb6..479097e 100644
+--- a/Compiler/fasto/src/CodeGen.fs
++++ b/Compiler/fasto/src/CodeGen.fs
+@@ -172,9 +172,12 @@ let rec compileExp  (e      : TypedExp)
+       else
+         [ Mips.LUI (place, makeConst (n / 65536))
+         ; Mips.ORI (place, place, makeConst (n % 65536)) ]
+-  | Constant (BoolVal _, _) ->
++  | Constant (BoolVal b, pos) ->
+       (* TODO project task 1: represent `true`/`false` values as `1`/`0` *)
+-      failwith "Unimplemented code generation of boolean constants"
++      if b then
++         [ Mips.LI (place, makeConst (int 1)) ]
++      else
++         [ Mips.LI (place, makeConst (int 0)) ]               
+   | Constant (CharVal c, pos) -> [ Mips.LI (place, makeConst (int c)) ]
+ 
+   (* Create/return a label here, collect all string literals of the program
+@@ -244,17 +247,29 @@ let rec compileExp  (e      : TypedExp)
+         `Times` and `Divide` are very similar to `Plus`/`Minus`
+         `Not` and `Negate` are simpler; you can use `Mips.XORI` for `Not`
+   *)
+-  | Times (_, _, _) ->
+-      failwith "Unimplemented code generation of multiplication"
++  | Times (e1, e2, pos) ->
++      let t1 = newName "times_L"
++      let t2 = newName "times_R"
++      let code1 = compileExp e1 vtable t1
++      let code2 = compileExp e2 vtable t2
++      code1 @ code2 @ [Mips.MUL (place,t1,t2)]
+ 
+-  | Divide (_, _, _) ->
+-      failwith "Unimplemented code generation of division"
++  | Divide (e1, e2, pos) ->
++      let t1 = newName "divide_L"
++      let t2 = newName "divide_R"
++      let code1 = compileExp e1 vtable t1
++      let code2 = compileExp e2 vtable t2
++      code1 @ code2 @ [Mips.DIV (place,t1,t2)]
+ 
+-  | Not (_, _) ->
+-      failwith "Unimplemented code generation of not"
++  | Not (e1, pos) -> 
++      let t1 = newName "not"
++      let code1 = compileExp e1 vtable t1
++      code1 @ [Mips.XORI (place, t1, "1")]
+ 
+-  | Negate (_, _) ->
+-      failwith "Unimplemented code generation of negate"
++  | Negate (e1, pos) ->
++      let t1 = newName "negate"
++      let code1 = compileExp e1 vtable t1
++      code1 @ [Mips.SUB (place,"0",t1)]
+ 
+   | Let (dec, e1, pos) ->
+       let (code1, vtable1) = compileDec dec vtable
+@@ -402,15 +417,34 @@ let rec compileExp  (e      : TypedExp)
+         Look in `AbSyn.fs` for the expression constructors of `And` and `Or`.
+         The implementation of `And` and `Or` is more complicated than `Plus`
+         because you need to ensure the short-circuit semantics, e.g.,
+-        in `e1 || e2` if the execution of `e1` will evaluate to `true` then 
+-        the code of `e2` must not be executed. Similar for `And` (&&). 
++        in `e1 || e2` if the execution of `e1` will evaluate to `true` then
++        the code of `e2` must not be executed. Similar for `And` (&&).
+   *)
+-  | And (_, _, _) ->      
+-      failwith "Unimplemented code generation of &&"
+-
+-  | Or (_, _, _) ->
+-      failwith "Unimplemented code generation of ||"
+-
++  | And (e1,e2,pos) ->
++      let t1label = newName "lbl_t1"
++      let t2label = newName "lbl_t2"
++      let flabel = newName "lbl_f"
++      let elabel = newName "lbl_e"
++      let t1 = newName "And_L"
++      let t2 = newName "And_R"
++      let code1 = compileCond e1 vtable t1label flabel
++      let code2 = compileCond e2 vtable t2label flabel
++      code1 @ [Mips.LABEL t1label] @ code2 @ 
++      [Mips.LABEL t2label; Mips.LI (place, makeConst (int 1)); Mips.J elabel; 
++      Mips.LABEL flabel; Mips.LI (place, makeConst (int 0)); Mips.LABEL elabel]
++
++  | Or (e1, e2, pos) ->
++      let tlabel = newName "lbl_t"
++      let f1label = newName "lbl_f1"
++      let f2label = newName "lbl_f2"
++      let elabel = newName "lbl_e"
++      let t1 = newName "Or_L"
++      let t2 = newName "Or_R"
++      let code1 = compileCond e1 vtable tlabel f1label
++      let code2 = compileCond e2 vtable tlabel f2label
++      code1 @ [Mips.LABEL f1label] @ code2 @ 
++      [Mips.LABEL f2label; Mips.LI (place, makeConst (int 0)); Mips.J elabel; 
++      Mips.LABEL tlabel; Mips.LI (place, makeConst (int 1)); Mips.LABEL elabel]
+   (* Indexing:
+      1. generate code to compute the index
+      2. check index within bounds
+@@ -593,13 +627,13 @@ let rec compileExp  (e      : TypedExp)
+          ; Mips.LABEL loop_end
+          ]
+ 
+-  (* TODO project task 2: 
++  (* TODO project task 2:
+         `replicate(n, a)`
+         `filter (f, arr)`
+         `scan(f, ne, arr)`
+      Look in `AbSyn.fs` for the shape of expression constructors
+         `Replicate`, `Filter`, `Scan`.
+-     General Hint: write down on a piece of paper the C-like pseudocode 
++     General Hint: write down on a piece of paper the C-like pseudocode
+         for implementing them, then translate that to Mips pseudocode.
+      To allocate heap space for an array you may use `dynalloc` defined
+         above. For example, if `sz_reg` is a register containing an integer `n`,
+@@ -610,17 +644,55 @@ let rec compileExp  (e      : TypedExp)
+         will place in register `arr_reg` the start address of the new array.
+         Since you need to allocate space for the result arrays of `Replicate`,
+         `Map` and `Scan`, then `arr_reg` should probably be `place` ...
+-     
+-     `replicate(n,a)`: You should allocate a new (result) array, and execute a 
++
++     `replicate(n,a)`: You should allocate a new (result) array, and execute a
+         loop of count `n`, in which you store the value hold into the register
+-        corresponding to `a` into each memory location corresponding to an 
++        corresponding to `a` into each memory location corresponding to an
+         element of the result array.
+         If `n` is less than `0` then remember to terminate the program with
+-        an error -- see implementation of `iota`.        
++        an error -- see implementation of `iota`.
+   *)
+-  | Replicate (_, _, _, _) ->
+-      failwith "Unimplemented code generation of replicate"
++  | Replicate (n_exp, a_exp, a_type, pos) ->
++      // symbolic registers
++      let size_reg = newName "size_reg"
++      let ele_reg = newName "ele_reg"
++      let resit_reg = newName "resit_reg"
++      let i_reg = newName "i_reg"
++      let tmp_reg = newName "tmp_reg"
+ 
++      // labels
++      let safe_lab = newName "safe_lab"
++      let loop_beg = newName "loop_beg"
++      let loop_end = newName "loop_end"
++
++      let n_code = compileExp n_exp vtable size_reg
++      let a_code = compileExp a_exp vtable ele_reg
++
++      let checksize =   [ Mips.ADDI (size_reg, size_reg, "-1")
++                        ; Mips.BGEZ (size_reg, safe_lab) // Jump to safe if n-1>=0
++                        ; Mips.LI ("5", makeConst (fst pos))
++                        ; Mips.J "_IllegalArrSizeError_"
++                        ; Mips.LABEL (safe_lab)
++                        ; Mips.ADDI (size_reg, size_reg, "1")
++                        ]
++      let init_regs =   [ Mips.ADDI (resit_reg, place, "4") // place reg contains pointer to allocated mem (with dynalloc)
++                        ; Mips.MOVE (i_reg, "0")]
++
++      let loop_header = [ Mips.LABEL loop_beg // while ...
++                        ; Mips.SUB (tmp_reg, i_reg, size_reg)
++                        ; Mips.BGEZ (tmp_reg, loop_end)]
++      let loop_rep    = match getElemSize a_type with // do ..
++                        | One  -> [ Mips.SB (ele_reg, resit_reg, "0") ]
++                        | Four -> [ Mips.SW (ele_reg, resit_reg, "0") ] 
++      let loop_footer = [ Mips.ADDI (resit_reg, resit_reg, makeConst (elemSizeToInt (getElemSize a_type)))
++                        ; Mips.ADDI (i_reg, i_reg, "1")
++                        ; Mips.J loop_beg
++                        ; Mips.LABEL loop_end]
++      n_code @ a_code
++      @ checksize
++      @ dynalloc (size_reg, place, a_type)
++      @ init_regs
++      @ loop_header @ loop_rep @ loop_footer
+   (* TODO project task 2: see also the comment to replicate.
+      (a) `filter(f, arr)`:  has some similarity with the implementation of map.
+      (b) Use `applyFunArg` to call `f(a)` in a loop, for every element `a` of `arr`.
+@@ -629,25 +701,129 @@ let rec compileExp  (e      : TypedExp)
+           - increment a counter (initialized before the loop)
+      (d) It is useful to maintain two array iterators: one for the input array `arr`
+          and one for the result array. (The latter increases slower because
+-         some of the elements of the input array are skipped because they fail 
++         some of the elements of the input array are skipped because they fail
+          under the predicate).
+      (e) The last step (after the loop writing the elments of the result array)
+          is to update the logical size of the result array to the value of the
+-         counter computed in step (c). You do this of course with a 
++         counter computed in step (c). You do this of course with a
+          `Mips.SW(counter_reg, place, "0")` instruction.
+   *)
+-  | Filter (_, _, _, _) ->
+-      failwith "Unimplemented code generation of map"
++  | Filter (farg, arr_exp, elem_type, pos) ->
++      (* symbolic registers *)
++      let size_reg = newName "size_reg" (* size of input array *)
++      let arr_reg  = newName "arr_reg"  (* address of array *)
++      let res_reg = newName "res_reg"
++      let size_outreg = newName "size_outreg" (*size of output array*) 
++      let resit_reg = newName "resit_reg" (* address of element in new array *)
++      let elem_reg = newName "elem_reg" (* address of single element *)
++      let i_reg = newName "i_reg"
++      let tmp_reg = newName "tmp_reg"
+ 
++     (* labels *)
++      let loop_beg = newName "loop_beg"
++      let loop_end = newName "loop_end"
++      let loop_inc = newName "loop_inc"
++    
++     (* code *)
++      let arr_code = compileExp arr_exp vtable arr_reg
++      let get_size = [ Mips.LW (size_reg, arr_reg, "0") ]
++
++      let init_regs = [ Mips.ADDI (resit_reg, place, "4")
++                      ; Mips.MOVE (i_reg, "0")
++                      ; Mips.ADDI (elem_reg, arr_reg, "4")
++                      ]
++      let loop_header = [ Mips.LABEL (loop_beg)
++                        ; Mips.SUB (tmp_reg, i_reg, size_reg)
++                        ; Mips.BGEZ (tmp_reg, loop_end) ]
++      let loop_filter0 =
++            match getElemSize elem_type with
++                | One -> Mips.LB(tmp_reg, elem_reg, "0")
++                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
++                | Four -> Mips.LW(tmp_reg, elem_reg, "0")
++                            :: applyFunArg(farg, [tmp_reg], vtable, res_reg, pos)
++      let loop_filtercheck =
++            Mips.BEQ(res_reg, "0", loop_inc)
++            :: match getElemSize elem_type with
++                    | One -> [Mips.SB(tmp_reg, resit_reg, "0")]
++                    | Four -> [Mips.SW(tmp_reg, resit_reg, "0")]
++            @ [Mips.ADDI(resit_reg, resit_reg, 
++                                    makeConst ( elemSizeToInt (getElemSize elem_type)))
++            ; Mips.ADDI(size_outreg, size_outreg, "1")]
++      let loop_footer =
++            [Mips.LABEL(loop_inc)
++            ;Mips.ADDI(i_reg, i_reg, "1")
++            ;Mips.ADDI(elem_reg, elem_reg, makeConst ( elemSizeToInt (getElemSize elem_type)))
++            ;Mips.J loop_beg
++            ;Mips.LABEL loop_end]
++
++      let set_outlen = 
++            [Mips.SW(size_outreg, place, "0")]
++      
++      arr_code
++      @ get_size
++      @ dynalloc (size_reg, place, elem_type)
++      @ init_regs
++      @ loop_header
++      @ loop_filter0
++      @ loop_filtercheck
++      @ loop_footer
++      @ set_outlen
++      
+   (* TODO project task 2: see also the comment to replicate.
+-     `scan(f, ne, arr)`: you can inspire yourself from the implementation of 
++     `scan(f, ne, arr)`: you can inspire yourself from the implementation of
+         `reduce`, but in the case of `scan` you will need to also maintain
+         an iterator through the result array, and write the accumulator in
+         the current location of the result iterator at every iteration of
+-        the loop. 
++        the loop.
+   *)
+-  | Scan (_, _, _, _, _) ->
+-      failwith "Unimplemented code generation of scan"
++  | Scan (farg, acc_exp, arr_exp, ele_type, pos) ->
++      // symbolic registers
++      let size_reg = newName "size_reg"
++      let arr_reg = newName "arr_reg" 
++      let elem_reg = newName "elem_reg"
++      let acc_reg = newName "acc_reg"
++      let i_reg = newName "i_reg"
++      let resit_reg = newName "resit_reg" // result iteration reg
++      let tmp_reg = newName "tmp_reg" 
++
++      // labels
++      let loop_beg = newName "loop_beg"
++      let loop_end = newName "loop_end"
++      
++      // code
++      let arr_code = compileExp arr_exp vtable arr_reg
++      let acc_code = compileExp acc_exp vtable acc_reg
++      let get_size = [ Mips.LW (size_reg, arr_reg, "0") ]
++
++      let init_regs =   [ Mips.ADDI (elem_reg, arr_reg, "4")
++                        ; Mips.ADDI (resit_reg, place, "4")
++                        ; Mips.MOVE(i_reg, "0")
++                        ]
++      let loop_header = [ Mips.LABEL(loop_beg)
++                        ; Mips.SUB(tmp_reg, i_reg, size_reg)
++                        ; Mips.BGEZ(tmp_reg, loop_end)
++                        ]
++      let loop_load =   match getElemSize ele_type with
++                        | One ->  [ Mips.LB (tmp_reg, elem_reg, "0") ]
++                        | Four -> [ Mips.LW (tmp_reg, elem_reg, "0") ]
++                                  
++      let loop_apply =  applyFunArg(farg, [acc_reg; tmp_reg], vtable, acc_reg, pos)
++                        @
++                        match getElemSize ele_type with 
++                        | One ->  [ Mips.SB (acc_reg, resit_reg, "0") ]
++                        | Four -> [ Mips.SW (acc_reg, resit_reg, "0") ]
++
++      let loop_footer = [ Mips.ADDI (resit_reg, resit_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
++                        ; Mips.ADDI (elem_reg, elem_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
++                        ; Mips.ADDI(i_reg, i_reg, "1")
++                        ; Mips.J loop_beg
++                        ; Mips.LABEL loop_end
++                        ]
++      arr_code @ acc_code 
++      @ get_size
++      @ dynalloc (size_reg, place, ele_type)
++      @ init_regs
++      @ loop_header @ loop_load @ loop_apply @ loop_footer
+ 
+ and applyFunArg ( ff     : TypedFunArg
+                 , args   : Mips.reg list
+@@ -890,4 +1066,3 @@ let compile (funs : TypedProg) : Mips.Instruction list =
+         Mips.LABEL "_heap_";
+         Mips.SPACE "100000"]
+   mips_prog
+-
+diff --git a/Compiler/fasto/src/Interpreter.fs b/Compiler/fasto/src/Interpreter.fs
+index ed0e4d6..a74c414 100644
+--- a/Compiler/fasto/src/Interpreter.fs
++++ b/Compiler/fasto/src/Interpreter.fs
+@@ -24,6 +24,7 @@ The main function of interest in this module is:
+ 
+ open System
+ open AbSyn
++open System.Web.Configuration
+ 
+ (* An exception for reporting run-time errors. *)
+ exception MyError of string * Position
+@@ -154,26 +155,53 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
+           | _ -> invalidOperands "Minus on non-integral args: " [(Int, Int)] res1 res2 pos
+ 
+   (* TODO: project task 1:
+-     Look in `AbSyn.fs` for the arguments of the `Times` 
+-     (`Divide`,...) expression constructors. 
+-        Implementation similar to the cases of Plus/Minus. 
++     Look in `AbSyn.fs` for the arguments of the `Times`
++     (`Divide`,...) expression constructors.
++        Implementation similar to the cases of Plus/Minus.
+         Try to pattern match the code above.
+         For `And`/`Or`: make sure to implement the short-circuit semantics,
+         e.g., `And (e1, e2, pos)` should not evaluate `e2` if `e1` already
+-              evaluates to false. 
++              evaluates to false.
+   *)
+-  | Times(_, _, _) ->        
+-        failwith "Unimplemented interpretation of multiplication"
+-  | Divide(_, _, _) ->
+-        failwith "Unimplemented interpretation of division"
+-  | And (_, _, _) ->
+-        failwith "Unimplemented interpretation of &&"
+-  | Or (_, _, _) ->
+-        failwith "Unimplemented interpretation of ||"
+-  | Not(_, _) ->
+-        failwith "Unimplemented interpretation of not"
+-  | Negate(_, _) ->
+-        failwith "Unimplemented interpretation of negate"
++  | Times(e1, e2, pos) ->
++        let res1   = evalExp(e1, vtab, ftab)
++        let res2   = evalExp(e2, vtab, ftab)
++        match (res1, res2) with
++          | (IntVal n1, IntVal n2) -> IntVal (n1*n2)
++          | (_,_) -> invalidOperands "multiplication on non-integral args: " [(Int, Int)] res1 res2 pos
++
++  | Divide(e1, e2, pos) ->
++        let res1   = evalExp(e1, vtab, ftab)
++        let res2   = evalExp(e2, vtab, ftab)
++        match (res1, res2) with
++          | (IntVal n1, IntVal n2) -> if(n2 = 0) then invalidOperands "division on integral where the later is zero args: " [(Int, Int)] res1 res2 pos else IntVal (n1/n2)
++          | (_, _) -> invalidOperands "division on non-integral args: " [(Int, Int)] res1 res2 pos
++
++  | And (e1, e2, pos) ->
++      let r1 = evalExp(e1, vtab, ftab)
++      let r2 = evalExp(e2, vtab, ftab)
++      match (r1, r2) with
++        | (BoolVal b1, BoolVal b2) -> if b1 then BoolVal(b2) else BoolVal(b1)
++        | (_, _) -> invalidOperands "Invalid AND operand types" [(Bool, Bool)] r1 r2 pos
++
++  | Or (e1, e2, pos) ->
++      let r1 = evalExp(e1, vtab, ftab)
++      let r2 = evalExp(e2, vtab, ftab)
++      match (r1, r2) with
++        | (BoolVal b1, BoolVal b2) -> if b1 then BoolVal(b1) else BoolVal (b2)
++        | (_, _) -> invalidOperands "Invalid OR operand types" [(Bool, Bool)] r1 r2 pos
++
++  | Not(e1, pos) ->
++      let r1 = evalExp(e1, vtab, ftab)
++      match r1 with
++        | BoolVal b1 -> BoolVal (not b1)
++        | _ -> invalidOperand "Invalid NOT operand type" Bool r1 pos
++
++  | Negate(e1, pos) ->
++      let r1 = evalExp(e1, vtab, ftab)
++      match r1 with
++        | IntVal n1 -> IntVal (-1*n1)
++        | _ -> invalidOperand "Invalid Negate operand types" Int r1 pos
+ 
+   | Equal(e1, e2, pos) ->
+         let r1 = evalExp(e1, vtab, ftab)
+@@ -183,6 +211,7 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
+           | (BoolVal b1, BoolVal b2) -> BoolVal (b1 = b2)
+           | (CharVal c1, CharVal c2) -> BoolVal (c1 = c2)
+           | (_, _) -> invalidOperands "Invalid equality operand types" [(Int, Int); (Bool, Bool); (Char, Char)] r1 r2 pos
++
+   | Less(e1, e2, pos) ->
+         let r1 = evalExp(e1, vtab, ftab)
+         let r2 = evalExp(e2, vtab, ftab)
+@@ -258,34 +287,66 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
+           | otherwise -> raise (MyError("Third argument of reduce is not an array: "+ppVal 0 arr
+                                        , pos))
+   (* TODO project task 2: `replicate(n, a)`
+-     Look in `AbSyn.fs` for the arguments of the `Replicate` 
++     Look in `AbSyn.fs` for the arguments of the `Replicate`
+      (`Map`,`Scan`) expression constructors.
+        - evaluate `n` then evaluate `a`,
+        - check that `n` evaluates to an integer value >= 0
+-       - If so then create an array containing `n` replicas of 
+-         the value of `a`; otherwise raise an error (containing 
++       - If so then create an array containing `n` replicas of
++         the value of `a`; otherwise raise an error (containing
+          a meaningful message).
+   *)
+-  | Replicate (_, _, _, _) ->
+-        failwith "Unimplemented interpretation of replicate"
++  | Replicate (nExp, aExp, tp, pos) ->
++        let n = evalExp(nExp, vtab, ftab)
++        let a = evalExp(aExp, vtab, ftab)
++        match n with
++          | IntVal n ->
++            if n >= 0 then 
++              let rep = List.replicate n a 
++              ArrayVal(rep, valueType a)
++            else raise (MyError("Argument n must be greater or equal to zero." + ppExp 0 nExp, pos))
++          | otherwise -> raise (MyError("Argument n must be integer." + ppExp 0 nExp, pos))
+ 
+   (* TODO project task 2: `filter(p, arr)`
+        pattern match the implementation of map:
+-       - check that the function `p` result type (use `rtpFunArg`) is bool; 
++       - check that the function `p` result type (use `rtpFunArg`) is bool;
+        - evaluate `arr` and check that the (value) result corresponds to an array;
+        - use F# `List.filter` to keep only the elements `a` of `arr` which succeed
+          under predicate `p`, i.e., `p(a) = true`;
+        - create an `ArrayVal` from the (list) result of the previous step.
+   *)
+-  | Filter (_, _, _, _) ->
+-        failwith "Unimplemented interpretation of map"
+-
++  | Filter (farg, arrexp, _, pos) ->
++      let farg_ret_type = rtpFunArg farg ftab pos
++
++      match farg_ret_type with
++        | Bool ->
++          let arr = evalExp(arrexp, vtab, ftab)
++          match arr with
++          | ArrayVal (lst, tp1) ->
++              let funArg = fun x -> match evalFunArg(farg, vtab, ftab, pos, [x]) with
++                                    | BoolVal b -> b
++                                    | otherwise -> raise (MyError("Function return type must be boolean: " 
++                                                                  + ppFunArg 0 farg, pos))
++              let filt = List.filter funArg lst
++              ArrayVal(filt, tp1)
++          | otherwise -> raise (MyError("Second argument must be an array: " + ppVal 0 arr, pos))
++        | otherwise -> raise (MyError("Function return type must be boolean: " + ppFunArg 0 farg, pos))
+   (* TODO project task 2: `scan(f, ne, arr)`
+-     Implementation similar to reduce, except that it produces an array 
++
++     Implementation similar to reduce, except that it produces an array
+      of the same type and length to the input array `arr`.
+   *)
+-  | Scan (_, _, _, _, _) ->
+-        failwith "Unimplemented interpretation of scan"
++  | Scan (farg, ne, arrexp, tp, pos) ->
++        let farg_ret_type = rtpFunArg farg ftab pos
++        let arr  = evalExp(arrexp, vtab, ftab)
++        let nel  = evalExp(ne, vtab, ftab)
++        match arr with
++          | ArrayVal (lst,tp1) ->
++               let scan = List.scan (fun acc x -> evalFunArg (farg, vtab, ftab, pos, [acc;x])) nel lst
++               match scan with // List.scan creates a n+1 size array so ignore first element (which is initial acc)
++               | (x::xs) -> ArrayVal(xs, tp1)
++               | _ -> ArrayVal([], tp1)
++          | otherwise -> raise (MyError("Third argument of scan is not an array: "+ppVal 0 arr
++                                       , pos))
+ 
+   | Read (t,p) ->
+         let str = Console.ReadLine()
+@@ -343,7 +404,7 @@ and evalFunArg  ( funarg  : UntypedFunArg
+   | (FunName fid) ->
+     let fexp = SymTab.lookup fid ftab
+     match fexp with
+-      | None   -> raise (MyError("Call to known function "+fid, callpos))
++      | None   -> raise (MyError("Call to unknown function "+fid, callpos))
+       | Some f -> callFunWithVtable(f, aargs, SymTab.empty(), ftab, callpos)
+   | Lambda (rettype, parms, body, fpos) ->
+     callFunWithVtable ( FunDec ("<anonymous>", rettype, parms, body, fpos)
+diff --git a/Compiler/fasto/src/Lexer.fsl b/Compiler/fasto/src/Lexer.fsl
+index 3870636..5bf84d2 100644
+--- a/Compiler/fasto/src/Lexer.fsl
++++ b/Compiler/fasto/src/Lexer.fsl
+@@ -1,17 +1,17 @@
+ ////////////////////////////////////////////////////////////////////
+-// TODO: project task 1 
+-//   implement lexer tokens for the new operators: 
+-//   multiplication (*), division (/), numerical negation (~), 
++// TODO: project task 1
++//   implement lexer tokens for the new operators:
++//   multiplication (*), division (/), numerical negation (~),
+ //   logical negation (not), logical and (&&), logical or (||),
+ //   boolean literals (true, false)
+ //
+ //
+-// TODO: project task 2 
+-//   implement lexer tokens (keywords) for replicate, filter, scan 
++// TODO: project task 2
++//   implement lexer tokens (keywords) for replicate, filter, scan
+ //
+ //
+-// TODO: project task 4 
+-//   implement the lexer tokens (keywords) for array comprehension 
++// TODO: project task 4
++//   implement the lexer tokens (keywords) for array comprehension
+ ////////////////////////////////////////////////////////////////////
+ 
+ 
+@@ -63,15 +63,23 @@ let keyword (s, pos) =
+        | "fun"          -> Parser.FUN pos
+        | "fn"           -> Parser.FN pos
+        | "op"           -> Parser.OP pos
+-
++       | "not"          -> Parser.NOT pos
+ (* specials: *)
+        | "iota"         -> Parser.IOTA pos
+        | "map"          -> Parser.MAP  pos
+        | "reduce"       -> Parser.REDUCE pos
++       | "scan"         -> Parser.SCAN pos
++       | "filter"       -> Parser.FILTER pos
++       | "replicate"    -> Parser.REP pos
+        | "read"         -> Parser.READ pos
+        | "write"        -> Parser.WRITE pos
+        | _              -> Parser.ID (s, pos)
+ 
++
++let boolChooser(s) =
++     match s with
++      | "true" -> true
++      | _-> false
+ }
+ 
+ rule Token = parse
+@@ -86,6 +94,11 @@ rule Token = parse
+                                   ( int (Encoding.UTF8.GetString(lexbuf.Lexeme))
+                                   , getPos lexbuf )
+                               }
++
++  | ("true" | "false")  { Parser.BOOLLIT
++                                  ( boolChooser(Encoding.UTF8.GetString(lexbuf.Lexeme))
++                                  , getPos lexbuf )
++                              }
+   | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*
+                           { keyword ( Encoding.UTF8.GetString(lexbuf.Lexeme)
+                                     , getPos lexbuf ) }
+@@ -103,6 +116,11 @@ rule Token = parse
+                             Parser.STRINGLIT (AbSyn.fromCString str1, getPos lexbuf)
+                           }
+   | '+'                   { Parser.PLUS   (getPos lexbuf) }
++  | '*'                   { Parser.TIMES  (getPos lexbuf) }
++  | '/'                   { Parser.DIVIDE (getPos lexbuf) }
++  | "&&"                  { Parser.AND    (getPos lexbuf) }
++  | "||"                  { Parser.OR     (getPos lexbuf) }
++  | '~'                   { Parser.NEGATE (getPos lexbuf) }
+   | '-'                   { Parser.MINUS  (getPos lexbuf) }
+   | "=>"                  { Parser.ARROW  (getPos lexbuf) }
+   | "=="                  { Parser.DEQ    (getPos lexbuf) }
+diff --git a/Compiler/fasto/src/Parser.fsp b/Compiler/fasto/src/Parser.fsp
+index c47839b..3c636ac 100644
+--- a/Compiler/fasto/src/Parser.fsp
++++ b/Compiler/fasto/src/Parser.fsp
+@@ -23,30 +23,38 @@ let parse_error_rich =
+ // TODO: Add new (lexer) token definitions:
+ //
+ //   TODO: project task 1 :
+-//     - multiplication (*), division (/), numerical negation (~), 
++//     - multiplication (*), division (/), numerical negation (~),
+ //       logical negation (not), logical and (&&), logical or (||),
+ //       boolean literals (true, false)
+ //     - add the required precedence and associativity rules for
+ //       *, /, ~, not, &&, ||
+ //
+-//   TODO: project task 2: replicate, filter, scan 
++//   TODO: project task 2: replicate, filter, scan
+ //
+-//   TODO: project task 4: array comprehension 
++//   TODO: project task 4: array comprehension
+ //////////////////////////////////////////////////////////////////////
+ 
+ %token <int*(int*int)> NUM
+ %token <char*(int*int)> CHARLIT
++%token <bool*(int*int)> BOOLLIT
+ %token <string*(int*int)> ID STRINGLIT
+ %token <(int*int)> IF THEN ELSE LET IN EOF
++%token <(int*int)> AND OR NOT
++%token <(int*int)> NEGATE
+ %token <(int*int)> INT CHAR BOOL
+ %token <(int*int)> PLUS MINUS LESS
+-%token <(int*int)> DEQ LTH EQ OP MAP REDUCE IOTA ARROW
++%token <(int*int)> TIMES DIVIDE
++%token <(int*int)> DEQ LTH EQ OP MAP REDUCE IOTA ARROW FILTER SCAN REP
+ %token <(int*int)> FUN FN COMMA SEMICOLON READ WRITE
+ %token <(int*int)> LPAR RPAR LBRACKET RBRACKET LCURLY RCURLY
+ 
+ %nonassoc ifprec letprec
+ %left DEQ LTH
++%left AND OR
++%left NOT
++%left NEGATE
+ %left PLUS MINUS
++%left TIMES DIVIDE
+ 
+ %start Prog
+ %type <AbSyn.UntypedProg> Prog
+@@ -93,19 +101,26 @@ BinOp : PLUS  { (Lambda
+ ;
+ 
+ ///////////////////////////////////////////////////////
+-// TODO: project tasks 1,2,4: 
++// TODO: project tasks 1,2,4:
+ //       add grammer rules for the new expressions
+ ///////////////////////////////////////////////////////
+ 
+ Exp : NUM            { Constant (IntVal (fst $1), snd $1) }
+     | CHARLIT        { Constant (CharVal (fst $1), snd $1) }
++    | BOOLLIT        { Constant (BoolVal (fst $1), snd $1)}
+     | ID             { Var $1 }
+     | STRINGLIT      { StringLit $1 }
+     | LCURLY Exps RCURLY
+                      { ArrayLit ($2, (), $1) }
+     | Exp PLUS  Exp  { Plus ($1, $3, $2) }
+     | Exp MINUS Exp  { Minus($1, $3, $2) }
++    | Exp TIMES Exp  { Times($1, $3, $2) }
++    | Exp DIVIDE Exp { Divide($1,$3, $2) }
+     | Exp DEQ   Exp  { Equal($1, $3, $2) }
++    | Exp AND   Exp  { And($1, $3,  $2)  }
++    | Exp OR    Exp  { Or($1, $3, $2   ) }
++    | NEGATE Exp     { Negate($2, $1  )  }
++    | NOT Exp        { Not( $2, $1  )    }
+     | Exp LTH   Exp  { Less ($1, $3, $2) }
+     | IF Exp THEN Exp ELSE Exp %prec ifprec
+                      { If ($2, $4, $6, $1) }
+@@ -124,6 +139,16 @@ Exp : NUM            { Constant (IntVal (fst $1), snd $1) }
+                      { Reduce ($3, $5, $7, (), $1) }
+     | REDUCE LPAR OP BinOp COMMA Exp COMMA Exp RPAR
+                      { Reduce ($4, $6, $8, (), $1) }
++
++    | FILTER LPAR FunArg COMMA Exp RPAR
++                    { Filter ($3, $5, (), $1)}
++
++    | REP LPAR Exp COMMA Exp RPAR
++                    { Replicate ($3, $5, (), $1)}
++
++    | SCAN LPAR FunArg COMMA Exp COMMA Exp RPAR
++                    { Scan($3, $5, $7, (), $1)}
++
+     | LPAR Exp RPAR  { $2 }
+     | LET ID EQ Exp IN Exp %prec letprec
+                      { Let (Dec (fst $2, $4, $3), $6, $1) }
+diff --git a/Compiler/fasto/src/TypeChecker.fs b/Compiler/fasto/src/TypeChecker.fs
+index 93d4fbe..50a329b 100644
+--- a/Compiler/fasto/src/TypeChecker.fs
++++ b/Compiler/fasto/src/TypeChecker.fs
+@@ -16,6 +16,7 @@ The main function of interest in this module is:
+ *)
+ 
+ open AbSyn
++open System.Linq.Expressions
+ 
+ (* An exception for reporting type errors. *)
+ exception MyError of string * Position
+@@ -66,9 +67,9 @@ let rec checkBinOp  (ftab : FunTable)
+ (* Determine the type of an expression.  On the way, decorate each node in the
+    syntax tree with inferred types.  The result consist of a pair: the result
+    type tupled with the type-decorated expression. An exception is raised
+-   immediately on the first type mismatch - this happens in "checkTypesEqualOrError".  
+-   (It could instead collect each error as part of the result of checkExp and 
+-    report all errors at the end.) 
++   immediately on the first type mismatch - this happens in "checkTypesEqualOrError".
++   (It could instead collect each error as part of the result of checkExp and
++    report all errors at the end.)
+ *)
+ and checkExp  (ftab : FunTable)
+               (vtab : VarTable)
+@@ -108,23 +109,45 @@ and checkExp  (ftab : FunTable)
+         Implement by pattern matching Plus/Minus above.
+         See `AbSyn.fs` for the expression constructors of `Times`, ...
+     *)
+-    | Times (_, _, _) ->        
+-        failwith "Unimplemented type check of multiplication"
++    | Times (e1, e2, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        let (t2, e2_dec) = checkExp ftab vtab e2
++        if (Int = t1 && Int = t2)
++        then (Int, Times (e1_dec, e2_dec, pos))
++        else raise (MyError ("In Times: one of subexpression types is not Int: "+ppType t1+" and "+ppType t2, pos))
+ 
+-    | Divide (_, _, _) ->
+-        failwith "Unimplemented type check of division"
++    | Divide (e1, e2, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        let (t2, e2_dec) = checkExp ftab vtab e2
++        if (Int = t1 && Int = t2)
++        then (Int, Divide (e1_dec, e2_dec, pos))
++        else raise (MyError ("In Divide: one of subexpression types is not Int: "+ppType t1+" and "+ppType t2, pos))
+ 
+-    | And (_, _, _) ->
+-        failwith "Unimplemented type check of &&"
++    | And (e1, e2, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        let (t2, e2_dec) = checkExp ftab vtab e2
++        if (Bool = t1 && Bool = t2)
++        then (Bool, And (e1_dec, e2_dec, pos))
++        else raise (MyError ("In And: one of subexpression types is not a boolean: "+ppType t1+" and "+ppType t2, pos))
+ 
+-    | Or (_, _, _) ->
+-        failwith "Unimplemented type check of ||"
++    | Or (e1, e2, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        let (t2, e2_dec) = checkExp ftab vtab e2
++        if (Bool = t1 && Bool = t2)
++        then (Bool, Or (e1_dec, e2_dec, pos))
++        else raise (MyError ("In Or: one of subexpression types is not a boolean: "+ppType t1+" and "+ppType t2, pos))
+ 
+-    | Not (_, _) ->
+-        failwith "Unimplemented type check of not"
++    | Not (e1, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        if (Bool = t1)
++        then (Bool, Not (e1_dec,pos))
++        else raise (MyError ("In Not: The subexpression type is not a boolean: "+ppType t1, pos))
+ 
+-    | Negate (_, _) ->
+-        failwith "Unimplemented type check of negate"
++    | Negate (e1, pos) ->
++        let (t1, e1_dec) = checkExp ftab vtab e1
++        if (Int = t1)
++        then (Int, Negate(e1_dec,pos))
++        else raise (MyError ("In Negate ~: The subexpression type is not an Int: "+ppType t1, pos))
+ 
+     (* The types for e1, e2 must be the same. The result is always a Bool. *)
+     | Equal (e1, e2, pos) ->
+@@ -254,18 +277,21 @@ and checkExp  (ftab : FunTable)
+              raise (err ("neutral element", n_type))
+         else raise (err ("array element", elem_type))
+ 
+-    (* TODO project task 2: 
+-        See `AbSyn.fs` for the expression constructors of 
++    (* TODO project task 2:
++        See `AbSyn.fs` for the expression constructors of
+         `Replicate`, `Filter`, `Scan`.
+ 
+         Hints for `replicate(n, a)`:
+         - recursively type check `n` and `a`
+         - check that `n` has integer type
+-        - assuming `a` is of type `t` the result type 
++        - assuming `a` is of type `t` the result type
+           of replicate is `[t]`
+     *)
+-    | Replicate (_, _, _, _) ->
+-        failwith "Unimplemented type check of replicate"
++    | Replicate (nExp, aExp, _, pos) ->
++        let (n_t, n_dec) = checkExp ftab vtab nExp
++        let (a_t, a_dec) = checkExp ftab vtab aExp
++        if n_t = Int then (Array a_t, Replicate(n_dec, a_dec, a_t, pos))
++        else raise (MyError( "Replicate: expected n to be an integer" , pos))
+ 
+     (* TODO project task 2: Hint for `filter(f, arr)`
+         Look into the type-checking lecture slides for the type rule of `map`
+@@ -276,17 +302,59 @@ and checkExp  (ftab : FunTable)
+             - `arr` should be of type `[ta]`
+             - the result of filter should have type `[tb]`
+     *)
+-    | Filter (_, _, _, _) ->
+-        failwith "Unimplemented type check of map"
++    | Filter (f, arr_exp, _, pos) ->
++        let (arr_type, arr_exp_dec) = checkExp ftab vtab arr_exp
++        let elem_type = (* get array element type*)
++            match arr_type with
++            | Array t -> t
++            | otherwise -> raise (MyError ("Filter: argument not an array", pos))
+ 
+-    (* TODO project task 2: `scan(f, ne, arr)` 
++        let (f', f_res_type, f_arg_type) =  (* check function signature *)
++            match checkFunArg ftab vtab pos f with
++                | (f', res, [a1]) -> (f', res, a1)
++                | (_, res, args) -> raise (MyError ( "Filter: incompatible function type of " +
++                                                    (ppFunArg 0 f) + ": " + showFunType (args, res)
++                                                    , pos))
++        match (f_arg_type = elem_type) with
++            | true -> 
++                match f_res_type with
++                    | Bool -> (Array elem_type, Filter (f', arr_exp_dec, elem_type, pos)) 
++                    | otherwise -> raise (MyError ( "Filter: function is not a predicate function, expected type " +
++                                                        ppType Bool + "instead of" + ppType f_res_type
++                                                        , pos))
++            | otherwise -> raise (MyError ( "Filter: function input type not correct. Expected type " +
++                                            ppType elem_type + " instead of " + ppType f_arg_type
++                                            , pos))
++
++    (* TODO project task 2: `scan(f, ne, arr)`
+         Hint: Implementation is very similar to `reduce(f, ne, arr)`.
+-              (The difference between `scan` and `reduce` is that 
++              (The difference between `scan` and `reduce` is that
+               scan's return type is the same as the type of `arr`,
+               while reduce's return type is that of an element of `arr`).
+     *)
+-    | Scan (_, _, _, _, _) ->
+-        failwith "Unimplemented type check of scan"
++    | Scan (farg, acc_exp, arr_exp, _, pos) ->
++        let (acc_type, acc_dec) = checkExp ftab vtab acc_exp
++        let (arr_type, arr_dec) = checkExp ftab vtab arr_exp
++        let elem_type = match arr_type with
++                        | Array t -> t
++                        | other -> raise (MyError ("Scan: Argument not an array ", pos))
++        let (farg_typed, f_arg_type) =
++            match checkFunArg ftab vtab pos farg with
++                | (farg_typed, res, [a1; a2]) ->
++                    if a1 = a2 && a2 = res then (farg_typed, res)
++                    else raise (MyError( "Scan: incompatible function type of " + (ppFunArg 0 farg) + ": " + showFunType([a1; a2], res), pos))
++                | (_, res, args) ->
++                    raise (MyError( "Scan: incompatible function type of " + (ppFunArg 0 farg) + ": " + showFunType(args, res), pos))
++        if elem_type = f_arg_type && elem_type = acc_type then
++            (arr_type, Scan (farg_typed, acc_dec, arr_dec, elem_type, pos))
++        elif elem_type = f_arg_type then
++            raise (MyError ( "Reduce: unexpected accumulator element type " + ppType acc_type +
++                                   ", expected " + ppType f_arg_type
++                                 , pos))
++        else
++            raise (MyError ( "Reduce: unexpected array element type " + ppType elem_type +
++                                   ", expected " + ppType f_arg_type
++                                 , pos))
+ 
+ and checkFunArg  (ftab : FunTable)
+                  (vtab : VarTable)
+@@ -362,4 +430,3 @@ let checkProg (funDecs : UntypedFunDec list) : TypedFunDec list =
+       | Some (ret_type, args, mainpos) ->
+         raise ( MyError("Unexpected argument to main: "+showFunType (args, ret_type)+
+                         " (should be () -> <anything>)", mainpos) )
+-
+diff --git a/Compiler/fasto/tests/logicTest.fo b/Compiler/fasto/tests/logicTest.fo
+new file mode 100644
+index 0000000..2ea2486
+--- /dev/null
++++ b/Compiler/fasto/tests/logicTest.fo
+@@ -0,0 +1,3 @@
++fun bool main() =
++  let n = false && 3==3 in
++    write(n)
+diff --git a/Compiler/fasto/tests/multTest.fo b/Compiler/fasto/tests/multTest.fo
+new file mode 100644
+index 0000000..f02130e
+--- /dev/null
++++ b/Compiler/fasto/tests/multTest.fo
+@@ -0,0 +1,3 @@
++fun int main() =
++  let n = read(int) in
++    write(0/n)
+diff --git a/Compiler/fasto/tests/not_simple.fo b/Compiler/fasto/tests/not_simple.fo
+new file mode 100644
+index 0000000..c466068
+--- /dev/null
++++ b/Compiler/fasto/tests/not_simple.fo
+@@ -0,0 +1,2 @@
++fun bool main() =
++  let b = read(int) in write(true)
+\ No newline at end of file
+diff --git a/Compiler/fasto/tests/not_simple.in b/Compiler/fasto/tests/not_simple.in
+new file mode 100644
+index 0000000..7813681
+--- /dev/null
++++ b/Compiler/fasto/tests/not_simple.in
+@@ -0,0 +1 @@
++5
+\ No newline at end of file
+diff --git a/Compiler/fasto/tests/not_simple.out b/Compiler/fasto/tests/not_simple.out
+new file mode 100644
+index 0000000..02e4a84
+--- /dev/null
++++ b/Compiler/fasto/tests/not_simple.out
+@@ -0,0 +1 @@
++false
+\ No newline at end of file
+diff --git a/Compiler/fasto/tests/scan.out b/Compiler/fasto/tests/scan.out
+index fdf3b45..d0b145d 100644
+--- a/Compiler/fasto/tests/scan.out
++++ b/Compiler/fasto/tests/scan.out
+@@ -1 +1 @@
+-0 1 3 6 
++1 3 6 
+diff --git a/Compiler/fasto/tests/simpleTest.fo b/Compiler/fasto/tests/simpleTest.fo
+new file mode 100644
+index 0000000..785dbee
+--- /dev/null
++++ b/Compiler/fasto/tests/simpleTest.fo
+@@ -0,0 +1,3 @@
++fun int main() =
++    let a = not true in
++      let w = write(a) in 0
+diff --git a/Compiler/fasto/tests/unittest1.fo b/Compiler/fasto/tests/unittest1.fo
+new file mode 100644
+index 0000000..d161207
+--- /dev/null
++++ b/Compiler/fasto/tests/unittest1.fo
+@@ -0,0 +1,93 @@
++
++fun [char] write_nl ([char] str) =
++  let w = write(str) in write("\n")
++
++fun [char] assert (bool f) =
++  if f then write_nl("true") else write_nl("false")
++
++fun int main () =
++  let ww = write_nl("subtraction") in
++    let w = write_nl("pos int - pos int, ") in
++      let a = assert(5 - 3 == 2) in
++    let w = write_nl("neg int - pos int, ") in
++      let a = assert((0-5) - 3 == (0-8)) in
++    let w = write_nl("pos int - neg int, ") in
++      let a = assert(5 - (0-10) == 15) in
++    let w = write_nl("neg int - neg int, ") in
++      let a = assert((0-7) - (0-5) == (0-2)) in
++
++  let ww = write_nl("\naddition") in
++    let w = write_nl("pos int + pos int, ") in
++      let a = assert(2 + 2 == 4) in
++    let w = write_nl("neg int + pos int, ") in
++      let a = assert((0 - 2) + 4 == 2) in
++    let w = write_nl("pos int + neg int, ") in
++      let a = assert(5 + (0-10) == (0-5)) in
++    let w = write_nl("neg int + neg int, ") in
++      let a = assert((0-6) + (0-3) == (0-9)) in
++
++  let ww = write_nl("\nmultiplication") in
++    let w = write_nl("pos int * pos int, ") in
++      let a = assert(4 * 4 == 16) in
++    let w = write_nl("neg int * pos int, ") in
++      let a = assert((0-4) * 4 == (0-16)) in
++    let w = write_nl("pos int * neg int, ") in
++      let a = assert(4 * (0-4) == (0-16)) in
++    let w = write_nl("neg int * neg int, ") in
++      let a = assert((0-4) * (0-4) == 16) in
++    let w = write_nl("zero * pos int, ") in
++      let a = assert(0 * 4 == 0) in
++    let w = write_nl("zero * neg int, ") in
++      let a = assert(0 * (0-4) == 0) in
++
++  let ww = write_nl("\ndivision") in
++    let w = write_nl("pos int / pos int, ") in
++      let a = assert(10 / 2 == 5) in
++    let w = write_nl("neg int / pos int, ") in
++      let a = assert((0-10) / 2 == (0-5)) in
++    let w = write_nl("pos int / neg int, ") in
++      let a = assert(10 / (0-2) == (0-5)) in
++    let w = write_nl("neg int / neg int, ") in
++      let a = assert((0-10) / (0-2) == 5) in
++    let w = write_nl("zero / pos int, ") in
++      let a = assert(0 / 5 == 0) in
++    let w = write_nl("zero / neg int, ") in
++      let a = assert(0 / (0-5) == 0) in
++
++  let ww = write_nl("\nlogical and") in
++    let w = write_nl("true && true, ") in
++      let a = assert(true && true == true) in
++    let w = write_nl("true && false, ") in
++      let a = assert(true && false == false) in
++    let w = write_nl("false && true, ") in
++      let a = assert(false && true == false) in
++    let w = write_nl("false && false, ") in
++      let a = assert(false && false == false) in
++
++  let ww = write_nl("\nlogical or") in
++    let w = write_nl("true || true, ") in
++      let a = assert(true || true == true) in
++    let w = write_nl("true || false, ") in
++      let a = assert(true || false == true) in
++    let w = write_nl("false || true, ") in
++      let a = assert(false || true == true) in
++    let w = write_nl("false || false, ") in
++      let a = assert(false || false == false) in
++
++  // TODO:
++  let ww = write_nl("\nlogical negation") in
++    let w = write_nl("not true, ") in
++      let a = assert(not true == false) in
++    let w = write_nl("not false, ") in
++      let a = assert(not false == true) in
++    let w = write_nl("not not true, ") in
++      let a = assert(not not true == true) in
++    let w = write_nl("not not false, ") in
++      let a = assert(not not false == false) in
++
++  let ww = write_nl("\numerical negation") in
++    let w = write_nl("~5") in
++      let a = assert(~5 == 0-5) in
++    let w = write_nl("~(-10)") in
++      let a = assert(~(0-10) == 10) in
++  0

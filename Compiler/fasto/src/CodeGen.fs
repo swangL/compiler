@@ -825,15 +825,14 @@ let rec compileExp  (e      : TypedExp)
                         ; Mips.SUB(tmp_reg, i_reg, size_reg)
                         ; Mips.BGEZ(tmp_reg, loop_end)
                         ]
-      let loop_load =   match getElemSize ele_type with
-                        | One ->  [ Mips.LB (tmp_reg, elem_reg, "0") ]
-                        | Four -> [ Mips.LW (tmp_reg, elem_reg, "0") ]
-                                  
-      let loop_apply =  applyFunArg(farg, [acc_reg; tmp_reg], vtable, acc_reg, pos)
-                        @
-                        match getElemSize ele_type with 
-                        | One ->  [ Mips.SB (acc_reg, resit_reg, "0") ]
-                        | Four -> [ Mips.SW (acc_reg, resit_reg, "0") ]
+      let loop_load_apply =   
+                      match getElemSize ele_type with
+                        | One ->  Mips.LB (tmp_reg, elem_reg, "0")
+                                  :: applyFunArg(farg, [acc_reg; tmp_reg], vtable, acc_reg, pos)
+                                  @ [ Mips.SB (acc_reg, resit_reg, "0") ]
+                        | Four -> Mips.LW (tmp_reg, elem_reg, "0")
+                                  :: applyFunArg(farg, [acc_reg; tmp_reg], vtable, acc_reg, pos)
+                                  @ [ Mips.SW (acc_reg, resit_reg, "0") ]
 
       let loop_footer = [ Mips.ADDI (resit_reg, resit_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
                         ; Mips.ADDI (elem_reg, elem_reg, makeConst (elemSizeToInt (getElemSize ele_type)))
@@ -845,7 +844,7 @@ let rec compileExp  (e      : TypedExp)
       @ get_size
       @ dynalloc (size_reg, place, ele_type)
       @ init_regs
-      @ loop_header @ loop_load @ loop_apply @ loop_footer
+      @ loop_header @ loop_load_apply @ loop_footer
 
 and applyFunArg ( ff     : TypedFunArg
                 , args   : Mips.reg list

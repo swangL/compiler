@@ -200,7 +200,7 @@ let rec evalExp (e : UntypedExp, vtab : VarTable, ftab : FunTable) : Value =
   | Negate(e1, pos) ->
       let r1 = evalExp(e1, vtab, ftab)
       match r1 with
-        | IntVal n1 -> IntVal (-1*n1)
+        | IntVal n1 -> IntVal (-n1)
         | _ -> invalidOperand "Invalid Negate operand types" Int r1 pos
 
   | Equal(e1, e2, pos) ->

@@ -257,9 +257,16 @@ let rec compileExp  (e      : TypedExp)
   | Divide (e1, e2, pos) ->
       let t1 = newName "divide_L"
       let t2 = newName "divide_R"
+      let safe_lab = newName "safe_lab"
       let code1 = compileExp e1 vtable t1
       let code2 = compileExp e2 vtable t2
-      code1 @ code2 @ [Mips.DIV (place,t1,t2)]
+      code1 @ code2 @ 
+      [ Mips.BNE (t2, "0", safe_lab)
+      ; Mips.LI ("5", makeConst(fst pos))
+      ; Mips.J "_DivisionByZero_"
+      ; Mips.LABEL safe_lab
+      ; Mips.DIV (place,t1,t2)]
+      
 
   | Not (e1, pos) -> 
       let t1 = newName "not"
@@ -428,14 +435,14 @@ let rec compileExp  (e      : TypedExp)
       let code1 = compileExp e1 vtable t1
       let code2 = compileExp e2 vtable t2
       code1 
-      @ [ Mips.BEQ (t1, "0", label_f)] 
+      @ [ Mips.BEQ   (t1, "0", label_f)] 
       @ code2 
-      @ [ Mips.BEQ (t2, "0", label_f); 
-          Mips.LI (place, "1"); 
-          Mips.J label_e; 
-          Mips.LABEL label_f; 
-          Mips.LI (place, "0"); 
-          Mips.LABEL label_e ] 
+      @ [ Mips.BEQ   (t2, "0", label_f)
+        ; Mips.LI    (place, "1")
+        ; Mips.J     label_e
+        ; Mips.LABEL label_f 
+        ; Mips.LI    (place, "0") 
+        ; Mips.LABEL label_e ] 
 
   | Or (e1, e2, pos) ->
       let label_t = newName "lbl_t"
@@ -445,14 +452,15 @@ let rec compileExp  (e      : TypedExp)
       let code1 = compileExp e1 vtable t1
       let code2 = compileExp e2 vtable t2
       code1 
-      @ [ Mips.BNE (t1, "0", label_t);]
+      @ [ Mips.BNE   (t1, "0", label_t);]
       @ code2
-      @ [ Mips.BNE (t2, "0", label_t);
-          Mips.LI (place, "0");
-          Mips.J label_e;
-          Mips.LABEL label_t;
-          Mips.LI (place, "1");
-          Mips.LABEL label_e ]
+      @ [ Mips.BNE   (t2, "0", label_t)
+        ; Mips.LI    (place, "0")
+        ; Mips.J     label_e
+        ; Mips.LABEL label_t
+        ; Mips.LI    (place, "1")
+        ; Mips.LABEL label_e ]
+          
   (* Indexing:
      1. generate code to compute the index
      2. check index within bounds
@@ -1055,6 +1063,15 @@ let compile (funs : TypedProg) : Mips.Instruction list =
         Mips.ADDI(SP, SP, "16");     (* free stack space again *)
         Mips.JR (RA,[])
       ]
+    @  // Error code for division by zero
+      [ Mips.LABEL "_DivisionByZero_"
+      ; Mips.LA ("4", "_DivisionByZeroString_")
+      ; Mips.LI ("2","4"); Mips.SYSCALL (* print string *)
+      ; Mips.MOVE ("4", "5")
+      ; Mips.LI ("2","1"); Mips.SYSCALL (* print line number *)
+      ; Mips.LA ("4","_cr_")
+      ; Mips.LI ("2","4"); Mips.SYSCALL (* print CR *)
+      ; Mips.J "_stop_"]
     @ (* fixed error code for indexing errors *)
       [Mips.LABEL "_IllegalArrSizeError_";
        Mips.LA ("4","_IllegalArrSizeString_");
@@ -1071,7 +1088,10 @@ let compile (funs : TypedProg) : Mips.Instruction list =
        Mips.LABEL "_space_";
        Mips.ASCIIZ " ";
        Mips.LABEL "_IllegalArrSizeString_";
-       Mips.ASCIIZ "Error: Array size less or equal to 0 at line "]
+       Mips.ASCIIZ "Error: Array size less or equal to 0 at line ";
+       Mips.LABEL "_DivisionByZeroString_";
+       Mips.ASCIIZ "Error: Division by zero at line "; ]
+     
       (* String literals *)
      @ (Mips.COMMENT "String Literals" ::
         List.concat stringdata)

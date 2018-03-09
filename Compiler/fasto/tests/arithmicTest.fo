@@ -1,0 +1,21 @@
+fun int main () =
+  // negate
+  let w = write(~10) in
+  let w = write(~~10) in
+
+  // multiply
+  let w = write(5 * 5) in 
+  let w = write(0 * 5) in
+  let w = write(5 * ~5) in
+  let w = write(~5 * ~5) in
+  let w = write(~5 * 0) in
+  // multiply precedence
+  let w = write(5 + 5 * 5 + 10 * 10) in
+
+  // divide
+  let w = write(10 / 2) in
+  let w = write(~10 / 2) in
+  let w = write(~10 / ~10) in
+  let w = write(0 / 10) in
+  let w = write(10 / 0) in
+  0

@@ -1,3 +1,25 @@
-fun bool main() =
-  let n = false && 3==3 in
-    write(n)
+fun int main() =
+  // literals
+  let w = write(true) in
+  let w = write(false) in
+  
+  // not
+  let w = write(not true) in
+  let w = write(not false) in
+  let w = write(not not true) in
+  let w = write(not not false) in
+  
+  // and
+  let w = write(true && true) in 
+  let w = write(true && false) in
+  let w = write(false && true) in
+  let w = write(false && false) in
+  
+  // or
+  let w = write(true || true) in
+  let w = write(true || false) in
+  let w = write(false || true) in
+  let w = write(false || false) in
+  
+  0
+  

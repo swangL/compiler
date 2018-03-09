@@ -2,6 +2,7 @@ fun int main () =
   // negate
   let w = write(~10) in
   let w = write(~~10) in
+  let w = write(~10 + 20) in
 
   // multiply
   let w = write(5 * 5) in 
@@ -17,5 +18,8 @@ fun int main () =
   let w = write(~10 / 2) in
   let w = write(~10 / ~10) in
   let w = write(0 / 10) in
-  let w = write(10 / 0) in
+  // divide precedence
+  let w = write(5 + 5 / 5 + 10 / 10) in
+  let w = write(10 / 0) in // this should be last test because it throws error
+                           // if the line number changes, pls update error msg in output file
   0

@@ -20,6 +20,10 @@ fun int main() =
   let w = write(true || false) in
   let w = write(false || true) in
   let w = write(false || false) in
-  
+
+  // precedence
+  // here the result would be true if '==' had binded weaker than the operators
+  // but the result should be false
+  let w = write(true == false && not false && false == true) in
   0
   

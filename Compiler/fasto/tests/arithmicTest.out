@@ -1,5 +1,6 @@
 -10
 10
+10
 25
 0
 -25
@@ -10,4 +11,5 @@
 -5
 1
 0
-Error: Division by zero at line 20
+7
+Error: Division by zero at line 23

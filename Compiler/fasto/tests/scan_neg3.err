@@ -1,0 +1,1 @@
+Type error: Scan: unexpected accumulator element type int, expected bool at line 4, column 11

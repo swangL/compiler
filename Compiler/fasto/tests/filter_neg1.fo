@@ -1,0 +1,4 @@
+fun int greaterthan10 (int a) = if (a < 10) then 1 else 0
+
+fun int main () = 
+    let f = filter(greaterthan10, {0, 5, 10, 15, 200}) in 0

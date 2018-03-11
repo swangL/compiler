@@ -1,0 +1,1 @@
+Type error: Scan: incompatible function type of plus: bool * bool -> int at line 3, column 11

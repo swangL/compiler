@@ -1,0 +1,1 @@
+Type error: Scan: incompatible function type of and: bool * int -> bool at line 4, column 11

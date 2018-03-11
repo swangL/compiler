@@ -1,0 +1,4 @@
+fun int plus (int a, int b) = a + b
+
+fun int main () = 
+  let a = scan (plus, true, {false, true, false}) in 0

@@ -1,0 +1,1 @@
+Type error: Filter: array elements type is not what function expected. Expected type int instead of bool at line 4, column 13

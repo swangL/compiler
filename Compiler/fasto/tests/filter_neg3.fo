@@ -1,0 +1,4 @@
+fun bool greaterthan10 (int a) = if (a < 10) then true else false
+
+fun int main () = 
+    let f = filter(greaterthan10, 5) in 0

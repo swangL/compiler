@@ -1,0 +1,4 @@
+fun bool and (bool a, bool b) = a && b
+
+fun int main () = 
+  let a = scan (and, 0, {false, true, false}) in 0

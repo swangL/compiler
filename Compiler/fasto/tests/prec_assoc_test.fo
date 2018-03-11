@@ -1,0 +1,10 @@
+fun int main () = 
+  let w = write(true == false || true) in // eq binds weakest
+  let w = write(10 == 5 + 5 * 100 / 100) in // eq binds weakest part 2
+  let w = write(true == 10 < 20 || not false) in // less binds stronger than eq, && and ||
+  let w = write(not (not true && false) || true) in // not binds strongest of logical operators
+  let w = write(~(~(~(~10 + 30) - 40) * 2) / 5) in // negate binds strongest of arithmetic operators
+  let w = write(50 + 50 * 5 - 50 / 2) in // add and sub are weaker than mult and div
+  let w = write(~~10) in // negate is right associative
+  let w = write(not not true) in // not is right associative
+  0

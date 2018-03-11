@@ -291,7 +291,7 @@ and checkExp  (ftab : FunTable)
         let (n_t, n_dec) = checkExp ftab vtab nExp
         let (a_t, a_dec) = checkExp ftab vtab aExp
         if n_t = Int then (Array a_t, Replicate(n_dec, a_dec, a_t, pos))
-        else raise (MyError( "Replicate: expected n to be an integer" , pos))
+        else raise (MyError( "Replicate: expected first argument to be an integer" , pos))
 
     (* TODO project task 2: Hint for `filter(f, arr)`
         Look into the type-checking lecture slides for the type rule of `map`
@@ -320,10 +320,10 @@ and checkExp  (ftab : FunTable)
                 match f_res_type with
                     | Bool -> (Array elem_type, Filter (f', arr_exp_dec, elem_type, pos)) 
                     | otherwise -> raise (MyError ( "Filter: function is not a predicate function, expected type " +
-                                                        ppType Bool + "instead of" + ppType f_res_type
+                                                        ppType Bool + " instead of " + ppType f_res_type
                                                         , pos))
-            | otherwise -> raise (MyError ( "Filter: function input type not correct. Expected type " +
-                                            ppType elem_type + " instead of " + ppType f_arg_type
+            | otherwise -> raise (MyError ( "Filter: array elements type is not what function expected. Expected type " +
+                                            ppType f_arg_type  + " instead of " + ppType elem_type
                                             , pos))
 
     (* TODO project task 2: `scan(f, ne, arr)`
@@ -337,7 +337,7 @@ and checkExp  (ftab : FunTable)
         let (arr_type, arr_dec) = checkExp ftab vtab arr_exp
         let elem_type = match arr_type with
                         | Array t -> t
-                        | other -> raise (MyError ("Scan: Argument not an array ", pos))
+                        | other -> raise (MyError ("Scan: Argument not an array", pos))
         let (farg_typed, f_arg_type) =
             match checkFunArg ftab vtab pos farg with
                 | (farg_typed, res, [a1; a2]) ->
@@ -348,11 +348,11 @@ and checkExp  (ftab : FunTable)
         if elem_type = f_arg_type && elem_type = acc_type then
             (arr_type, Scan (farg_typed, acc_dec, arr_dec, elem_type, pos))
         elif elem_type = f_arg_type then
-            raise (MyError ( "Reduce: unexpected accumulator element type " + ppType acc_type +
+            raise (MyError ( "Scan: unexpected accumulator element type " + ppType acc_type +
                                    ", expected " + ppType f_arg_type
                                  , pos))
         else
-            raise (MyError ( "Reduce: unexpected array element type " + ppType elem_type +
+            raise (MyError ( "Scan: unexpected array element type " + ppType elem_type +
                                    ", expected " + ppType f_arg_type
                                  , pos))
 

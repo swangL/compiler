@@ -1,0 +1,2 @@
+fun int main () = 
+    let r = replicate(true, 10) in 0

@@ -50,11 +50,11 @@ let parse_error_rich =
 
 %nonassoc ifprec letprec
 %left DEQ 
-%left AND OR // moved down 1 line
 %left LTH 
+%left AND OR 
 %left PLUS MINUS
 %left TIMES DIVIDE  
-%right NEGATE NOT // changed to right
+%right NEGATE NOT
 
 %start Prog
 %type <AbSyn.UntypedProg> Prog

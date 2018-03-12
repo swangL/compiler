@@ -1,0 +1,1 @@
+Type error: In And: one of subexpression types is not a boolean: bool and int at line 2, column 22

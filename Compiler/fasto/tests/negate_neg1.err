@@ -1,0 +1,1 @@
+Type error: In Negate ~: The subexpression type is not an Int: bool at line 2, column 17

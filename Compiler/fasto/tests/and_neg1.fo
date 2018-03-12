@@ -1,0 +1,2 @@
+fun int main () = 
+  let w = write(true && 1) in 0

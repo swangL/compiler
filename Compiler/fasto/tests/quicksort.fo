@@ -1,0 +1,38 @@
+fun int readInt (int a) = read(int)
+fun int writeInt (int a) = write(a)
+
+// concatenates two integer arrays while placing a pivot element in the middle
+fun [int] concat_arr([int] arr1, [int] arr2, int p) =
+  let n = length(arr1) + length(arr2) + 1 in // the length of the resulting array
+  map( fn int (int x) => 
+         if (x < length(arr1)) then arr1[x]  // first use elements from first array
+           else if x == length(arr1) then p  // place pivot after first array
+           else arr2[x-length(arr1)-1]       // afterwards take elements from second array 
+       , iota(n)) // iota generates the needed indices
+
+// removes the last element and return the rest of the array
+fun [int] remove_pivot([int] arr) =
+  let res = iota(length(arr)-1) in
+  map(fn int (int x) => arr[x], res)
+
+// sorts an integer array using the quicksort algorithm
+fun [int] quicksort([int] arr) = 
+  if 1 < length(arr) then               // not trivially sorted yet
+    let pivot = arr[length(arr)-1] in   // use last element as pivot
+    let arr_no_p = remove_pivot(arr) in // make array without the pivot element
+    let p1 = filter(fn bool (int x) =>  // make one array with elements less or equal to pivot
+                      if (x < pivot) || (x == pivot) 
+                        then true 
+                        else false, arr_no_p) in
+    let p2 = filter(fn bool (int x) =>  // make another array with elements greater than pivot
+                      if (pivot < x) 
+                        then true 
+                        else false, arr_no_p) in
+    let q1 = quicksort(p1) in           // divide and conquer!
+    let q2 = quicksort(p2) in 
+    concat_arr(q1, q2, pivot)           // merge the two sorted partitions
+  else arr                              // return trivially solved array
+
+fun int main () = 
+  let arr = map(readInt, replicate(read(int), 0)) in // read n integers from keyboard 
+  let qs = quicksort(arr) in let w = map(writeInt, qs) in 0 // sort and print sorted array

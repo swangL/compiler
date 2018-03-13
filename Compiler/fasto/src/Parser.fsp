@@ -50,8 +50,8 @@ let parse_error_rich =
 
 %nonassoc ifprec letprec
 %left DEQ 
-%left LTH 
 %left AND OR 
+%left LTH 
 %left PLUS MINUS
 %left TIMES DIVIDE  
 %right NEGATE NOT

@@ -89,13 +89,14 @@ let rec copyConstPropFoldExp (vtable : VarTable)
             let e1' = copyConstPropFoldExp vtable e1
             let e2' = copyConstPropFoldExp vtable e2
             match (e1', e2') with
-                | (Constant (IntVal x, _), Constant (IntVal y, _)) ->
-                    Constant (IntVal (x * y), pos)
                 | (Constant (IntVal 0, _), _) -> Constant(IntVal 0, pos)
                 | (_, Constant (IntVal 0, _)) -> Constant(IntVal 0, pos)
                 | (Constant (IntVal 1, _), _) -> e2'
                 | (_, Constant (IntVal 1, _)) -> e1'
+                | (Constant (IntVal x, _), Constant (IntVal y, _)) ->
+                    Constant (IntVal (x * y), pos)
                 | _ -> Times (e1', e2', pos)
+                
         | And (e1, e2, pos) ->
             let e1' = copyConstPropFoldExp vtable e1
             let e2' = copyConstPropFoldExp vtable e2

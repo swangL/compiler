@@ -101,7 +101,9 @@ let rec copyConstPropFoldExp (vtable : VarTable)
             let e2' = copyConstPropFoldExp vtable e2
             match (e1', e2') with
                 | (Constant (BoolVal a, _), Constant (BoolVal b, _)) ->
-                    Constant (BoolVal (a && b), pos)
+                    match a,b with
+                        | false,_ -> Constant (BoolVal false,pos)
+                        | true,_ -> Constant (BoolVal (a && b), pos)
                 | _ -> And (e1', e2', pos)
         | Constant (x,pos) -> Constant (x,pos)
         | StringLit (x,pos) -> StringLit (x,pos)
